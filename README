@@ -1,0 +1,59 @@
+This repository contains code with utilities, baselines, instructions, and guidelines for the
+PAN CLEF 2024 shared task "Oppositional thinking analysis: Conspiracy vs critical narratives"
+https://pan.webis.de/clef24/pan24-web/oppositional-thinking-analysis.html
+The code is licensed under the APACHE 2.0 license, see LICENSE file.
+The exception is the span_f1_metric.py file, which is licensed under the GPL license, see the file for details.
+
+This document contains the high-level overview of the code,
+and the instructions to setup the environment for the project.
+
+For the details of the data, see README-DATA,
+for the details and the concept of the task, see README-TASK.
+
+IMPORTANT: keep up with the updates on the official repository,
+as the code and especially the README files might be improved and updated.
+
+
+# 1. High-level Overview
+
+The code is organized into three packages:
+
+- data_tools
+loading and preprocessing of the data
+
+- classif_experim
+baselines for the classification task, and the supporting functionality
+
+- sequence_labeling
+baselines for the sequence labeling task, and the supporting functionality
+
+- getting started
+First, create and modify the local variants of .gitignore and setting.py (from templates)
+only templates are git-tracked, to facilitate the local setup
+Second, setup the environment (see below). Third, run the experiments (see below).
+
+
+# 2. Setup of the environment using conda
+
+conda create --name env-name python=3.X # 3.10 is recommended
+conda activate env-name
+# from the root of the repository
+./generate_requirements.sh  # mind the additional dependencies, see the code
+pip install -r requirements.txt
+
+If you will be relying on spacy docs as input format while working
+with the seq. labeling baseline (this is the default so you probably will), do:
+python -m spacy download en_core_web_sm
+python -m spacy download es_core_news_sm
+
+
+# 3. Running the experiments
+Rename setting_template.py to settings.py and fill in the paths to the dataset files.
+
+python entrypoint for running the classification experiment (subtask 1) is:
+classif_experiment_runner.run_classif_experiments
+
+python entrypoint for running the seq. labeling experiment () is:
+seqlabel_experiment_runner.run_seqlab_experiments
+CLI entrypoint is the seqlabel_experiment_runner.main,
+you can run the module as in: run_seqlabel.sh.template, create the local .sh copy first

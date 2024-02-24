@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# rename to run_seqlabel.sh and use and modify as needed
+
+# entrypoint module
+MODULE_NAME=${MODULE_NAME:-"sequence_labeling/seqlabel_experiment_runner.py"}
+
+# Get additional PYTHONPATH folders from the user or default to the current directory
+ADDITIONAL_PYTHONPATH=${ADDITIONAL_PYTHONPATH:-"."}
+
+# Extend the PYTHONPATH
+export PYTHONPATH=$PYTHONPATH:$ADDITIONAL_PYTHONPATH
+
+for lang in en es; do
+    label="seqlabel_experiment_-${lang}"
+    python $MODULE_NAME $lang 5 \
+        --test 0 \
+        --experim_label $label \
+        --pause_after_fold 0 \
+        --pause_after_model 0 \
+        --max_seq_length 256 \
+        --gpu 0
+done

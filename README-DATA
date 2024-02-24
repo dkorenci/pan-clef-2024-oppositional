@@ -1,0 +1,48 @@
+********** DATA DESCRIPTION **********
+
+The format of the data, and the required fields are reflected in the structure of the .json training dataset.
+Each entry in the dataset is a single text, represented as a dictionary with the following fields:
+"id" - a unique identifier for the entry, "category" - text-level class,
+"text" - the text itself, and "annotations" - a list of annotations.
+"spacy_tokens" - a list of tokens, as provided by the spaCy tokenizer, encoded with method in dataset_utils.py.
+These tokens are provided to easy reconstruction of the spacy doc objects (read below),
+and for convenience, if a user needs access to the original tokenization.
+
+Each annotation is represented as a dictionary with the following fields:
+"category" - span-level category (see task description for details),
+"start_char", "end_char" - character-level boundaries (C-style, 0-based, end-exclusive).
+These are basic required fields. The following fields are also provided:
+"start_spacy_token", "end_spacy_token" - token-level boundaries (spaCy tokenization) - for reconstruction of the spacy doc objects,
+"annotator" - for additional information, not required,
+"span_text" - to ease the browsing of the dataset, not required.
+
+The data is pre-processed and tokenized for convenience.
+Baseline solutions for sequence labeling rely on the input data in spaCy docbin format,
+and loaders of spacy documents can be used for constructing a spaCy-based or any custom solution.
+Original spaCy tokenizer, customized for sub- URL, email, and mention tokenization, can also be used,
+for example to apply the models to new data.
+
+For non-python users, or those wishing to use a different data pipeline:
+'raw' "text" values, together with "start_char" and "end_char" fields
+should be used to construct the input data for the sequence labeling models.
+
+
+********** OUTPUT OF THE MODEL PREDICTIONS AT EVALUATION TIME **********
+
+Test data will be provided in the same format as the training data.
+However, only 'text' and 'id' fields will be provided.
+The task participants will be required to provide the output in the same format as the training data.
+
+For classification, the output must be a list of dictionaries, each with 'id' and 'category' fields.
+The 'id' fields will be used to match the output with the original test data.
+
+For sequence labeling, the output must be a list of dictionaries, each with 'id', 'annotations' fields.
+The 'annotations' list can either be empty, or it must contain dictionaries with 'category', 'start_char', 'end_char' fields.
+
+Code that demonstrates the correct formatting of the models' output and the evaluation
+agains the test data can be found in the following modules:
+classif_experiment_eval.py, seqlab_experiment_eval.py
+Key are the methods for saving the model predictions.
+
+For classification, mind the 'positive_class' parameter in the 'evaluate_on_test_dataset' method.
+It should reflect the positive class used while training the model.

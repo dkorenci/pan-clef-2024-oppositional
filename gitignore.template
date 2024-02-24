@@ -1,0 +1,20 @@
+# generic ignores of the project
+# put local ignores to .gitignore
+
+.gitignore
+/settings.py
+.idea
+.vscode
+
+*.pyc
+__pycache__
+.ipynb_checkpoints
+
+*.log
+*.sh
+*.txt
+*.json
+*.pkl
+*.safetensors
+
+requirements.txt
