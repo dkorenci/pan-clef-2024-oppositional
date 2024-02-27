@@ -12,6 +12,7 @@ __pycache__
 
 *.log
 *.sh
+!generate_requirements.sh
 *.txt
 *.json
 *.pkl
