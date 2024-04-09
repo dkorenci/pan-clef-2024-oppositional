@@ -23,7 +23,7 @@ def run_classif_crossvalid(lang, model_label, model_params, positive_class='crit
     '''
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
     score_fns = classif_scores('all')
-    texts, classes, txt_ids = load_dataset_classification(lang, positive_class)
+    texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class)
     if test: texts, classes, txt_ids = texts[:test], classes[:test], txt_ids[:test]
     foldgen = StratifiedKFold(n_splits=num_folds, random_state=rnd_seed, shuffle=True)
     fold_index = 0
