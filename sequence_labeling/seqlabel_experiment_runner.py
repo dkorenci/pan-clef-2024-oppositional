@@ -14,6 +14,7 @@ from classif_experim.classif_utils import classif_scores
 from classif_experim.pynvml_helpers import print_cuda_devices
 from data_tools.dataset_loaders import load_dataset_full
 from data_tools.spacy_utils import get_doc_id, get_doc_class, get_annoation_tuples_from_doc
+from evaluation.oppositional_evaluator import calc_macro_averages
 from sequence_labeling.seqlab_sklearn_wrapper_multitask import OppSequenceLabelerMultitask
 from sequence_labeling.span_f1_metric import compute_score_pr
 from data_tools.span_data_definitions import SPAN_LABELS_OFFICIAL
@@ -42,7 +43,7 @@ def run_crossvalid_seqlab_transformers(lang, model_label, model_params, num_fold
     fold_index = 0
     task_labels, task_indices = task_label_data()
     # make columns list that has values 'P', 'R', 'F1' and f'{X}-F1', f'{X}-P', f'{X}-R' for all X in TASK_LABELS
-    columns = ['F1', 'P', 'R'] + [f'{X}-F1' for X in task_labels] + [f'{X}-P' for X in task_labels] + [f'{X}-R' for X in task_labels]
+    columns = ['macro-F1', 'macro-P', 'macro-R'] + [f'{X}-F1' for X in task_labels] + [f'{X}-P' for X in task_labels] + [f'{X}-R' for X in task_labels]
     results_df = pd.DataFrame(columns=columns)
     rseed = rnd_seed
     classes = [get_doc_class(doc) for doc in docs]
@@ -61,6 +62,7 @@ def run_crossvalid_seqlab_transformers(lang, model_label, model_params, num_fold
         spans_pred = model.predict(docs_test)
         del model
         scores = calculate_spanF1(docs_test, spans_test, spans_pred, task_labels)
+        calc_macro_averages(scores, verbose=False, overwrite_with_macro=True)
         scores_bin = calculate_binary_spanF1(spans_test, spans_pred, task_labels)
         scores.update(scores_bin)
         scores_df = pd.DataFrame({fname: [fval] for fname, fval in scores.items()})
@@ -213,7 +215,7 @@ HF_MODEL_LIST_SEQLAB = {
 
 HF_CORE_HPARAMS_SEQLAB_MULTITASK = {
     'learning_rate': 2e-5,
-    'num_train_epochs': 10,
+    'num_train_epochs': 1,
     'warmup': 0.1,
     'weight_decay': 0.01,
     'batch_size': 16,
