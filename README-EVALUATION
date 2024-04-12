@@ -1,0 +1,54 @@
+README-DATA contains detailed description of the data format.
+
+
+The unlabeled test data, as well as the results of the task participants,
+have to be .json files with the same structure as the training data.
+However, these files need to contain only the relevant fields: test data will contain texts, ids, and tokens,
+while the results should contain only the ids and the model's output relevant to the task: binary classes or span annotation.
+
+The evaluation script is evaluation.oppositional_evaluator.py
+
+********** EVALUATION METRICS **********
+
+For the classification task, the referent evaluation metric is the MCC score (Matthews Correlation Coefficient).
+Macro-averaged F1 score and per-class F1 scores will also be reported.
+
+For the sequence labeling task, the referent evaluation metric is the span-F1 score.
+The final span-F1 score will be calculated as the (macro) average of the span-F1 scores for each span category.
+Macro-averaged precision and recall will also be reported.
+
+********** DETAILS OF THE EVALUATION PROCEDURE **********
+
+The evaluation script is evaluation.oppositional_evaluator.py
+The script is a standalone python script to be run from the command line:
+
+python oppositional_evaluator.py task1 --gold <path_to_file_with_labels> --predictions <path_to_predictions_file> --outdir <path_to_folder_for_saving_results>
+or
+python oppositional_evaluator.py task2 --gold <path_to_file_with_labels> --predictions <path_to_predictions_file> --outdir <path_to_folder_for_saving_results>
+
+The script will output the evaluation results to outdir/evaluation.prototext file, in PAN/TIRA format.
+
+********** DETAILS OF THE FORMAT OF THE TEST AND THE PARTICIPANT's OUTPUT DATA **********
+
+Test data will be provided in the same format as the training data.
+However, only 'text', 'id', and 'spacy_tokens' fields will be provided.
+
+The task participants will be required to provide the output in the same format as the training data.
+
+For classification, the output must be a list of dictionaries, each with 'id' and 'category' fields.
+The 'id' fields will be used to match the output with the original test data, and the IDs
+in the output must match the IDs in the test data.
+Values of each 'category' field must be one of the two classes: 'CRITICAL' or 'CONSPIRACY'.
+
+For sequence labeling, the output must be a list of dictionaries, each with 'id', 'annotations' fields.
+The 'annotations' list must contain dictionaries with 'category', 'start_char', 'end_char' fields.
+To signify the absence of the annotation, the 'annotations' list must either be empty,
+or contain a single dictionary with 'category' field set to 'X'.
+
+Code that demonstrates the correct formatting of the models' output and the evaluation
+against the test data can be found in the following modules:
+classif_experiment_eval.py, seqlab_experiment_eval.py
+Key are the methods for saving the model predictions in the .json format:
+save_text_category_predictions_to_json(), save_sequence_label_predictions_to_json()
+For classification, mind the 'positive_class' parameter in the 'evaluate_on_test_dataset' method.
+It should reflect the positive class used while training the model.

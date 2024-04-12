@@ -26,23 +26,3 @@ For non-python users, or those wishing to use a different data pipeline:
 'raw' "text" values, together with "start_char" and "end_char" fields
 should be used to construct the input data for the sequence labeling models.
 
-
-********** OUTPUT OF THE MODEL PREDICTIONS AT EVALUATION TIME **********
-
-Test data will be provided in the same format as the training data.
-However, only 'text' and 'id' fields will be provided.
-The task participants will be required to provide the output in the same format as the training data.
-
-For classification, the output must be a list of dictionaries, each with 'id' and 'category' fields.
-The 'id' fields will be used to match the output with the original test data.
-
-For sequence labeling, the output must be a list of dictionaries, each with 'id', 'annotations' fields.
-The 'annotations' list can either be empty, or it must contain dictionaries with 'category', 'start_char', 'end_char' fields.
-
-Code that demonstrates the correct formatting of the models' output and the evaluation
-agains the test data can be found in the following modules:
-classif_experiment_eval.py, seqlab_experiment_eval.py
-Key are the methods for saving the model predictions.
-
-For classification, mind the 'positive_class' parameter in the 'evaluate_on_test_dataset' method.
-It should reflect the positive class used while training the model.
