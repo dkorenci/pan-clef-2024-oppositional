@@ -8,7 +8,8 @@ This document contains the high-level overview of the code,
 and the instructions to setup the environment for the project.
 
 For the details of the data, see README-DATA,
-for the details and the concept of the task, see README-TASK.
+for the conceptual overview of the task, and the guidelines and possible approaches for the participants,
+see the slides in pan2024_oppositional_overview_guidelines.pdf
 
 IMPORTANT: keep up with the updates on the official repository,
 as the code and especially the README files might be improved and updated.
