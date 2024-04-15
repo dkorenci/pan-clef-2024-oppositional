@@ -59,6 +59,12 @@ def decode_spacy_tokens_from_bytes(encoded_string: str) -> List[str]:
     return spacy_tokens
 
 def reconstruct_spacy_docs_from_json(json_file, lang, doc_categ_map=CATEGORY_MAPPING_CRITICAL_POS_INVERSE):
+    '''
+    Reconstruct Spacy Doc objects (for sequence labeling baseline) from a json file.
+    The json records corresponding to texts should have the following keys: 'id' and 'spacy_tokens'
+    If the records contain the 'category' and 'annotations' keys, this data will be added to the texts.
+    :return:
+    '''
     define_spacy_extensions()
     with open(json_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
@@ -72,11 +78,13 @@ def reconstruct_spacy_docs_from_json(json_file, lang, doc_categ_map=CATEGORY_MAP
         doc = Doc(nlp.vocab, words=words) # Recreate the Doc object
         # set the doc id and category properties
         doc._.set(ON_DOC_ID, item['id'])
-        doc._.set(ON_DOC_CLS_EXTENSION, doc_categ_map[item['category']])
-        for annot in item.get('annotations', []): # add the annotations to doc (if any)
-            # Calculate span from start/end token indices
-            span_tuple = json_annotation_to_tuple(annot)
-            doc._.get(ON_DOC_EXTENSION).append(span_tuple)
+        if 'category' in item:
+            doc._.set(ON_DOC_CLS_EXTENSION, doc_categ_map[item['category']])
+        if 'annotations' in item:
+            for annot in item.get('annotations', []): # add the annotations to doc (if any)
+                # Calculate span from start/end token indices
+                span_tuple = json_annotation_to_tuple(annot)
+                doc._.get(ON_DOC_EXTENSION).append(span_tuple)
         recreated_docs.append(doc)
     return recreated_docs
 
