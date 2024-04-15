@@ -3,9 +3,11 @@ Methods for evaluating the predictions of models written to .json files
 in the officail format.
 '''
 import json
+import subprocess
 
 from classif_experim.classif_utils import classif_scores
 from data_tools.dataset_utils import BINARY_MAPPING_CRITICAL_POS, BINARY_MAPPING_CONSPIRACY_POS
+from evaluation import oppositional_evaluator
 
 
 def evaluate_classif_predictions(pred_file: str, gold_file: str, positive_class: str):
@@ -40,3 +42,16 @@ def evaluate_classif_predictions(pred_file: str, gold_file: str, positive_class:
     score_fns = classif_scores('all')
     scores_fmtd = "\n".join([f"{fname:10}: {f(gold_labels, pred_labels):.3f}" for fname, f in score_fns.items()])
     print(scores_fmtd)
+
+def run_official_evaluation_script(task, predictions, gold, outdir='.'):
+    '''
+    Run the official evaluation script with the given arguments, from the command line:
+    python oppositional_evaluator.py task --predictions predictions --gold gold --outdir outdir
+    '''
+    eval_script_path = oppositional_evaluator.__file__
+    command = ['python', eval_script_path, task, '--predictions', predictions, '--gold', gold, '--outdir', outdir]
+    process = subprocess.run(command, text=True, capture_output=True)
+    # Print the output
+    print("Eval. Script Output:", process.stdout, "\n")
+    if process.stderr:
+        print("Eval. Script Errors:", process.stderr)
