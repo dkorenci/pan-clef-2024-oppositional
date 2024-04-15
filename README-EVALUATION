@@ -1,12 +1,19 @@
 README-DATA contains detailed description of the data format.
 
-
 The unlabeled test data, as well as the results of the task participants,
 have to be .json files with the same structure as the training data.
 However, these files need to contain only the relevant fields: test data will contain texts, ids, and tokens,
 while the results should contain only the ids and the model's output relevant to the task: binary classes or span annotation.
 
 The evaluation script is evaluation.oppositional_evaluator.py
+The code demonstrating how to perform full build-predict-save json results-evaluate cycle can be found
+in the following modules: classif_experiment_eval.py, seqlab_experiment_eval.py
+Specifically, you can use the save_text_category_predictions_to_json(),
+and save_sequence_label_predictions_to_json() methods to format your predictions in the .json format,
+and use the oppositional_evaluator.py script to test evaluation of the predictions against the gold labels.
+If you want to fully simulate the evaluation-time procedure, split the available train dataset into train and test,
+remove the labels from the test data, change the values of the dataset paths in settings.py, and run the above methods.
+
 
 ********** EVALUATION METRICS **********
 
