@@ -1,5 +1,5 @@
 import base64
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 import json
 from spacy.tokens import Doc
@@ -15,17 +15,33 @@ CATEGORY_MAPPING_CRITICAL_POS_INVERSE = {0: 'CONSPIRACY', 1: 'CRITICAL'}
 CATEGORY_MAPPING_CONSPIRACY_POS_INVERSE = {0: 'CRITICAL', 1: 'CONSPIRACY'}
 
 def classif_binary_str_labels(positive_class: str) -> List[str]:
+    """
+    Return a list of string labels for binary classification.
+
+    Args:
+        positive_class (str): The positive class label ('conspiracy' or 'critical').
+
+    Returns:
+        List[str]: List of string labels.
+    """
+
     positive_class = positive_class.lower()
     if positive_class == 'critical': return ['CONSPIRACY', 'CRITICAL']
     elif positive_class == 'conspiracy': return ['CRITICAL', 'CONSPIRACY']
     else: raise ValueError(f'Unknown positive class: {positive_class}')
 
 def binary_labels_to_str(labels: List[int], positive_class: str) -> List[str]:
-    '''
-    Convert binary labels to string labels, using the positive class label.
-    :param positive_class: 'conspiracy' or 'critical'
-    :return: list of string labels
-    '''
+    """
+    Convert binary labels to string labels using the positive class label.
+
+    Args:
+        labels (List[int]): List of binary labels.
+        positive_class (str): The positive class label ('conspiracy' or 'critical').
+
+    Returns:
+        List[str]: List of string labels.
+    """
+
     positive_class = positive_class.lower()
     if positive_class == 'conspiracy': binmap = CATEGORY_MAPPING_CONSPIRACY_POS_INVERSE
     elif positive_class == 'critical': binmap = CATEGORY_MAPPING_CRITICAL_POS_INVERSE
@@ -33,38 +49,76 @@ def binary_labels_to_str(labels: List[int], positive_class: str) -> List[str]:
     return [binmap[label] for label in labels]
 
 def json_annotation_to_tuple(annot: dict) -> Tuple[str, int, int, str]:
-    '''
-    Convert a json-serialized annotation to a tuple of (label, start, end, author)
-    :param annot:
-    :return:
-    '''
+    """
+    Convert a json-serialized annotation to a tuple of (label, start, end, author).
+
+    Args:
+        annot (dict): Annotation in json format.
+
+    Returns:
+        Tuple[str, int, int, str]: Annotation as a tuple.
+    """
+
     return annot['category'], annot['start_spacy_token'], annot['end_spacy_token'], annot['annotator']
 
 def tuple_to_json_annotation(annot: Tuple[str, int, int, str]) -> dict:
-    '''
-    Convert a tuple of (label, start, end, author) to a json-serializable annotation
-    :param annot:
-    :return:
-    '''
+    """
+    Convert a tuple of (label, start, end, author) to a json-serializable annotation.
+
+    Args:
+        annot (Tuple[str, int, int, str]): Annotation as a tuple.
+
+    Returns:
+        dict: Annotation in json format.
+    """
+
     return {'category': annot[0], 'start_spacy_token': annot[1], 'end_spacy_token': annot[2], 'annotator': annot[3]}
 
 def encode_spacy_tokens_as_bytes(spacy_tokens: List[str]) -> str:
+    """
+    Encode spaCy tokens as a base64 string.
+
+    Args:
+        spacy_tokens (List[str]): List of spaCy tokens.
+
+    Returns:
+        str: Encoded tokens as a base64 string.
+    """
+
     json_string = json.dumps(spacy_tokens)
     bytes_representation = base64.b64encode(json_string.encode('utf-8'))
     return bytes_representation.decode('utf-8')
 
 def decode_spacy_tokens_from_bytes(encoded_string: str) -> List[str]:
+    """
+    Decode spaCy tokens from a base64 string.
+
+    Args:
+        encoded_string (str): Encoded tokens as a base64 string.
+
+    Returns:
+        List[str]: List of decoded spaCy tokens.
+    """
+
     bytes_representation = base64.b64decode(encoded_string)
     spacy_tokens = json.loads(bytes_representation.decode('utf-8'))
     return spacy_tokens
 
-def reconstruct_spacy_docs_from_json(json_file, lang, doc_categ_map=CATEGORY_MAPPING_CRITICAL_POS_INVERSE):
-    '''
+def reconstruct_spacy_docs_from_json(json_file: str, lang: str, doc_categ_map: dict = CATEGORY_MAPPING_CRITICAL_POS_INVERSE) -> List[Doc]:
+    """
     Reconstruct Spacy Doc objects (for sequence labeling baseline) from a json file.
     The json records corresponding to texts should have the following keys: 'id' and 'spacy_tokens'
     If the records contain the 'category' and 'annotations' keys, this data will be added to the texts.
-    :return:
-    '''
+
+    Args:
+        json_file (str): Path to the json file.
+        lang (str): Language of the documents.
+        doc_categ_map (dict, optional): Mapping of document categories. Default is CATEGORY_MAPPING_CRITICAL_POS_INVERSE.
+
+    Returns:
+        List[Doc]: List of reconstructed spaCy Doc objects.
+    """
+
     define_spacy_extensions()
     with open(json_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
@@ -88,19 +142,37 @@ def reconstruct_spacy_docs_from_json(json_file, lang, doc_categ_map=CATEGORY_MAP
         recreated_docs.append(doc)
     return recreated_docs
 
-def save_text_category_predictions_to_json(ids: List[str], predictions: List[str], json_file: str):
+def save_text_category_predictions_to_json(ids: List[str], predictions: List[str], json_file: str) -> None:
+    """
+    Save text category predictions to a json file.
+
+    Args:
+        ids (List[str]): List of text ids.
+        predictions (List[str]): List of category predictions.
+        json_file (str): Path to the json file.
+
+    Returns:
+        None
+    """
+
     data = [{'id': id, 'category': pred} for id, pred in zip(ids, predictions)]
     json_data = json.dumps(data, ensure_ascii=False, indent=2)
     with open(json_file, 'w', encoding='utf-8') as file:
         file.write(json_data)
 
-def save_sequence_label_predictions_to_json(docs: List[Doc], preds: List[List[Tuple[str, int, int, str]]], json_file: str):
-    '''
-    :param list of spacy docs
-    :param preds: predictions, for each document a list of tuples (label, token_start, token_end, author)
-    :param json_file: filename to save the predictions to
-    :return:
-    '''
+def save_sequence_label_predictions_to_json(docs: List[Doc], preds: List[List[Tuple[str, int, int, str]]], json_file: str) -> None:
+    """
+    Save sequence label predictions to a json file.
+
+    Args:
+        docs (List[Doc]): List of spaCy Doc objects.
+        preds (List[List[Tuple[str, int, int, str]]]): Predictions for each document.
+        json_file (str): Path to the json file.
+
+    Returns:
+        None
+    """
+
     def convert_token_to_char_boundaries(doc, token_start, token_end):
         first_char_index = doc[token_start].idx
         last_char_index = doc[token_end - 1].idx + len(doc[token_end - 1])
@@ -122,21 +194,30 @@ def save_sequence_label_predictions_to_json(docs: List[Doc], preds: List[List[Tu
 if __name__ == '__main__':
     pass
 
-
-def span_annot_to_spanf1_format(annot: dict):
-    '''
+def span_annot_to_spanf1_format(annot: dict) -> List[Union[str, set]]:
+    """
     Convert a span annotation to the format used for span-F1 score calculation.
-    :param annot: dict with keys 'category', 'start_char', 'end_char'
-    :return: list of [category, list of character indices]
-    '''
+
+    Args:
+        annot (dict): Span annotation in json format.
+
+    Returns:
+        List[Union[str, set]]: Span annotation in span-F1 format.
+    """
+
     return [annot['category'], set(list(range(annot['start_char'], annot['end_char'])))]
 
+def validate_json_annotations(annots: List[dict]) -> None:
+    """
+    Validate the annotations of a single document loaded from a json file.
 
-def validate_json_annotations(annots: List):
-    '''
-    Validate the annotations of a single document, loaded from a .json file.
-    :return:
-    '''
+    Args:
+        annots (List[dict]): List of annotations.
+
+    Returns:
+        None
+    """
+
     if len(annots) == 0: return # can be an empty list
     valid_labels = set(SPAN_LABELS_OFFICIAL.values())
     for annot in annots:
@@ -152,12 +233,17 @@ def validate_json_annotations(annots: List):
             if annot['category'] not in valid_labels:
                 raise ValueError(f'Invalid annotation category: {annot}')
 
+def is_empty_annot(annots: List[dict]) -> bool:
+    """
+    Check if the list of annotations is empty or contains only the NONE_LABEL annotation.
 
-def is_empty_annot(annots: List):
-    '''
-    Check if the list of annotations is empty, or contains only the NONE_LABEL annotation.
-    :return:
-    '''
+    Args:
+        annots (List[dict]): List of annotations.
+
+    Returns:
+        bool: True if the list is empty or contains only NONE_LABEL, False otherwise.
+    """
+
     if len(annots) == 0: return True
     if len(annots) == 1 and annots[0]['category'] == NONE_LABEL: return True
     return False

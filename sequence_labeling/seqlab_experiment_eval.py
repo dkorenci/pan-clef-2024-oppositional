@@ -12,11 +12,18 @@ from sequence_labeling.span_f1_metric import compute_score_pr
 from settings import TEST_DATASET_EN, TEST_DATASET_ES
 
 
-def evaluate_seqlab_on_test_dataset(model: SklearnTransformerBase, lang: str):
-    '''
-    Applies the seq. label. model to the test dataset,
-    and evaluates the predictions using the official evaluation script.
-    '''
+def evaluate_seqlab_on_test_dataset(model: SklearnTransformerBase, lang: str) -> None:
+    """
+    Applies the sequence labeling model to the test dataset and evaluates the predictions using the official evaluation script.
+
+    Args:
+        model (SklearnTransformerBase): The sequence labeling model to evaluate.
+        lang (str): The language of the test dataset ('en' for English, 'es' for Spanish).
+
+    Returns:
+        None
+    """
+
     test_fname = TEST_DATASET_EN if lang == 'en' else TEST_DATASET_ES
     test_docs = reconstruct_spacy_docs_from_json(test_fname, lang)
     spans_predict = model.predict(test_docs)
@@ -24,12 +31,20 @@ def evaluate_seqlab_on_test_dataset(model: SklearnTransformerBase, lang: str):
     save_sequence_label_predictions_to_json(test_docs, spans_predict, pred_fname)
     run_official_evaluation_script('task2', pred_fname, test_fname)
 
-def build_eval_seqlab_model(lang):
+def build_eval_seqlab_model(lang: str) -> None:
+    """
+    Builds and evaluates the sequence labeling model on the test dataset.
+
+    Args:
+        lang (str): The language of the test dataset ('en' for English, 'es' for Spanish).
+
+    Returns:
+        None
+    """
+
     hf_model_id = 'bert-base-cased' if lang == 'en' else 'dccuchile/bert-base-spanish-wwm-cased'
     model = load_or_build_seqlab_fulltrain_model(lang, hf_model_id, model_label='bert-baseline')
     evaluate_seqlab_on_test_dataset(model, lang)
 
 if __name__ == '__main__':
     build_eval_seqlab_model('en')
-
-

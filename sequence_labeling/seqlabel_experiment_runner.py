@@ -3,7 +3,7 @@ import datetime
 import logging
 import time
 from copy import copy
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 
 import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold
@@ -21,21 +21,37 @@ from data_tools.span_data_definitions import SPAN_LABELS_OFFICIAL
 
 global logger
 
-def task_label_data():
-    '''
+def task_label_data() -> Tuple[List[str], Dict[str, int]]:
+    """
     Define variables with information on the task labels. Each task corresponds to a single span label,
     since the model is multitask and each task is a sequence labeling task for a single label.
-    :return:
-    '''
+
+    Returns:
+        Tuple[List[str], Dict[str, int]]: A tuple containing the list of task labels and a dictionary mapping task labels to task indices.
+    """
+
     task_labels = sorted(list(SPAN_LABELS_OFFICIAL.values()))
     task_indices = {l: i for i, l in enumerate(task_labels)}
     return task_labels, task_indices
 
-def run_crossvalid_seqlab_transformers(lang, model_label, model_params, num_folds=5,
-                                       rnd_seed=3154561, test=False, pause_after_fold=0):
-    '''
-    Run x-fold crossvalidation for a given model, and report the results.
-    '''
+def run_crossvalid_seqlab_transformers(lang: str, model_label: str, model_params: Dict, num_folds: int = 5, 
+                                       rnd_seed: int = 3154561, test: Union[int, bool] = False, pause_after_fold: int = 0) -> None:
+    """
+    Run x-fold cross-validation for a given model, and report the results.
+
+    Args:
+        lang (str): Language code.
+        model_label (str): Model label.
+        model_params (Dict): Dictionary of model parameters.
+        num_folds (int, optional): Number of folds for cross-validation. Default is 5.
+        rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
+        test (Union[int, bool], optional): Number of train examples to use for testing, or False to use all data. Default is False.
+        pause_after_fold (int, optional): Pause duration in minutes after each fold. Default is 0.
+
+    Returns:
+        None
+    """
+
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
     docs = load_dataset_full(lang, format='docbin')
     if test: docs = docs[:test]
@@ -89,14 +105,46 @@ def run_crossvalid_seqlab_transformers(lang, model_label, model_params, num_fold
         logger.info(f'{fname:8}: [{", ".join(f"{val:.3f}" for val in results_df[fname])}]')
     #print(results_df)
 
-def build_seqlab_model(model_label, rseed, model_params, task_labels, task_indices):
-    ''' Factory method to build a sequence labelling model. '''
+def build_seqlab_model(model_label: str, rseed: int, model_params: Dict, 
+                       task_labels: List[str], task_indices: Dict[str, int]) -> OppSequenceLabelerMultitask:
+    """
+    Factory method to build a sequence labeling model.
+
+    Args:
+        model_label (str): Model label.
+        rseed (int): Random seed for reproducibility.
+        model_params (Dict): Dictionary of model parameters.
+        task_labels (List[str]): List of task labels.
+        task_indices (Dict[str, int]): Dictionary mapping task labels to task indices.
+
+    Returns:
+        OppSequenceLabelerMultitask: An instance of OppSequenceLabelerMultitask.
+    """
+
     return OppSequenceLabelerMultitask(hf_model_label=model_label, rnd_seed=rseed,
                                        task_labels=task_labels, task_indices=task_indices,
                                        **model_params)
 
-def run_seqlab_experiments(lang, num_folds, rnd_seed, test=False, experim_label=None,
-                            pause_after_fold=0, pause_after_model=0, max_seq_length=256):
+def run_seqlab_experiments(lang: str, num_folds: int, rnd_seed: int, test: Union[int, bool] = False, 
+                           experim_label: str = None, pause_after_fold: int = 0, pause_after_model: int = 0, 
+                           max_seq_length: int = 256) -> None:
+    """
+    Run sequence labeling experiments.
+
+    Args:
+        lang (str): Language code.
+        num_folds (int): Number of folds for cross-validation.
+        rnd_seed (int): Random seed for reproducibility.
+        test (Union[int, bool], optional): Number of train examples to use for testing, or False to use all data. Default is False.
+        experim_label (str, optional): Experiment label. Default is None.
+        pause_after_fold (int, optional): Pause duration in minutes after each fold. Default is 0.
+        pause_after_model (int, optional): Pause duration in minutes after each model. Default is 0.
+        max_seq_length (int, optional): Maximum sequence length. Default is 256.
+
+    Returns:
+        None
+    """
+
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     experim_label = f'{experim_label}_rseed_{rnd_seed}' if experim_label else f'rseed_{rnd_seed}'
     log_filename = f"seqlabel_experiments_{experim_label}_{timestamp}.log"
@@ -139,14 +187,20 @@ def run_seqlab_experiments(lang, num_folds, rnd_seed, test=False, experim_label=
             logger.info(f'Pausing for {pause_after_model} minutes...')
             time.sleep(pause_after_model * 60)
 
-def spans_to_spanF1_format(ref_docs, spans: List[Tuple[str, int, int, str]]):
-    '''
+def spans_to_spanF1_format(ref_docs: List, spans: List[Tuple[str, int, int, str]]) -> Dict[str, List[List]]:
+    """
     Convert a list of (label, start, end, author) tuples to the format used by the spanF1 scorer:
     map text_id: spans, where spans is a list of span lists, one per label; for each label spans
-    are in the form [label, set of character indices]
-    :param spans:
-    :return:
-    '''
+    are in the form [label, set of character indices].
+
+    Args:
+        ref_docs (List): List of reference documents.
+        spans (List[Tuple[str, int, int, str]]): List of spans.
+
+    Returns:
+        Dict[str, List[List]]: Dictionary mapping text IDs to lists of spans.
+    """
+
     result = {}
     for doc, span_list in zip(ref_docs, spans):
         text_id = get_doc_id(doc)
@@ -164,12 +218,21 @@ def spans_to_spanF1_format(ref_docs, spans: List[Tuple[str, int, int, str]]):
         result[text_id] = f1spans
     return result
 
-def calculate_binary_spanF1(spans_test: List[List[Tuple[str, int, int, str]]],
-                        spans_predict: List[List[Tuple[str, int, int, str]]], task_labels):
-    '''
-    Calculate binary classification metrics for occurr-vs-no-occur of a given label in the text.
+def calculate_binary_spanF1(spans_test: List[List[Tuple[str, int, int, str]]], 
+                            spans_predict: List[List[Tuple[str, int, int, str]]], task_labels: List[str]) -> Dict[str, float]:
+    """
+    Calculate binary classification metrics for occurrence vs. no occurrence of a given label in the text.
     Predictions of occurrence are derived from the spans predicted by the model.
-     '''
+
+    Args:
+        spans_test (List[List[Tuple[str, int, int, str]]]): List of true spans.
+        spans_predict (List[List[Tuple[str, int, int, str]]]): List of predicted spans.
+        task_labels (List[str]): List of task labels.
+
+    Returns:
+        Dict[str, float]: Dictionary of binary classification metrics.
+    """
+
     scoring_fns = classif_scores('span-binary')
     scores = {}
     for label in task_labels:
@@ -184,13 +247,42 @@ def calculate_binary_spanF1(spans_test: List[List[Tuple[str, int, int, str]]],
             scores[f'{label}-{metric}-b'] = score_fn(spans_test_bin, spans_predict_bin)
     return scores
 
-def calculate_spanF1(ref_docs, spans_test: List[List[Tuple[str, int, int, str]]],
-                        spans_predict: List[List[Tuple[str, int, int, str]]], task_labels, disable_logger=True):
+def calculate_spanF1(ref_docs: List, spans_test: List[List[Tuple[str, int, int, str]]], 
+                     spans_predict: List[List[Tuple[str, int, int, str]]], task_labels: List[str], 
+                     disable_logger: bool = True) -> Dict[str, float]:
+    """
+    Calculate span-level F1 scores for the predicted spans.
+
+    Args:
+        ref_docs (List): List of reference documents.
+        spans_test (List[List[Tuple[str, int, int, str]]]): List of true spans.
+        spans_predict (List[List[Tuple[str, int, int, str]]]): List of predicted spans.
+        task_labels (List[str]): List of task labels.
+        disable_logger (bool, optional): Whether to disable logging. Default is True.
+
+    Returns:
+        Dict[str, float]: Dictionary of span-level F1 scores.
+    """
+
     spans_test_f1 = spans_to_spanF1_format(ref_docs, spans_test)
     spans_predict_f1 = spans_to_spanF1_format(ref_docs, spans_predict)
     return compute_score_pr(spans_predict_f1, spans_test_f1, task_labels, disable_logger=disable_logger)
 
-def demo_experiment(lang, test_size=0.2, num_epochs=1, rnd_seed=1443):
+def demo_experiment(lang: str, test_size: float = 0.2, num_epochs: int = 1, 
+                    rnd_seed: int = 1443) -> None:
+    """
+    Run a demonstration experiment with a small dataset.
+
+    Args:
+        lang (str): Language code.
+        test_size (float, optional): Proportion of the dataset to include in the test split. Default is 0.2.
+        num_epochs (int, optional): Number of training epochs. Default is 1.
+        rnd_seed (int, optional): Random seed for reproducibility. Default is 1443.
+
+    Returns:
+        None
+    """
+
     docs = load_dataset_full(lang, format='docbin')
     task_labels, task_indices = task_label_data()
     span_labels = [get_annoation_tuples_from_doc(doc) for doc in docs]
@@ -221,10 +313,17 @@ HF_CORE_HPARAMS_SEQLAB_MULTITASK = {
     'batch_size': 16,
 }
 
-def main():
-    '''
-    Entry point function to accept command line arguments
-    '''
+def main() -> None:
+    """
+    Entry point function to accept command line arguments.
+
+    Args:
+        None
+
+    Returns:
+        None
+    """
+
     parser = argparse.ArgumentParser(description="Run Sequence Labelling Experiments")
     # Required arguments
     parser.add_argument("lang", type=str, help="Language")

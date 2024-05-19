@@ -22,7 +22,16 @@ from transformers import DataCollatorWithPadding
 from classif_experim.pynvml_helpers import print_gpu_utilization, print_cuda_devices
 
 
-def set_torch_np_random_rseed(rseed):
+def set_torch_np_random_rseed(rseed: int) -> None:
+    """
+    Set random seeds for numpy, random, and torch to ensure reproducibility.
+    
+    Args:
+        rseed (int): The random seed value.
+
+    Returns:
+        None
+    """
     np.random.seed(rseed)
     random.seed(rseed)
     torch.manual_seed(rseed)
@@ -30,16 +39,31 @@ def set_torch_np_random_rseed(rseed):
     torch.cuda.manual_seed_all(rseed)
 
 class SklearnTransformerBase(metaclass=ABCMeta):
-    def __init__(self, hf_model_label, lang:str, eval=0.1,
-                 learning_rate=2e-5, num_train_epochs=3, weight_decay=0.01, batch_size=16, warmup=0.1, gradient_accumulation_steps=1,
-                 max_seq_length=128, device=None, rnd_seed=381757, tmp_folder=None):
-        '''
-        :param hf_model_label: hugginface repo model identifier
-        :param tmp_folder: Folder for saving model checkpoints, can be used for resuming the training.
-            If None, temporary folder will be used and resuming is not possible.
-        :param eval: A proportion of the train set used for model evaluation, or the number of train exapmples used.
-        If None, no evaluation will be performed - model will be trained on a fixed number of epochs.
-        '''
+    def __init__(self, hf_model_label: str, lang: str, eval: float = 0.1, learning_rate: float = 2e-5, num_train_epochs: int = 3, 
+                 weight_decay: float = 0.01, batch_size: int = 16, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
+                 max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None) -> None:
+        """
+        Initialize the SklearnTransformerBase with the given parameters.
+        
+        Args:
+            hf_model_label (str): Hugging Face model identifier.
+            lang (str): Language of the model ('en' for English, 'es' for Spanish).
+            eval (float, optional): Proportion of the training set used for evaluation. Default is 0.1.
+            learning_rate (float, optional): Learning rate for training. Default is 2e-5.
+            num_train_epochs (int, optional): Number of training epochs. Default is 3.
+            weight_decay (float, optional): Weight decay for training. Default is 0.01.
+            batch_size (int, optional): Batch size for training. Default is 16.
+            warmup (float, optional): Warmup ratio for learning rate. Default is 0.1.
+            gradient_accumulation_steps (int, optional): Gradient accumulation steps. Default is 1.
+            max_seq_length (int, optional): Maximum sequence length for inputs. Default is 128.
+            device (torch.device, optional): Device for model training and evaluation. Default is None.
+            rnd_seed (int, optional): Random seed for reproducibility. Default is 381757.
+            tmp_folder (str, optional): Temporary folder for model checkpoints. Default is None.
+
+        Returns:
+            None
+        """
+
         self._hf_model_label = hf_model_label
         self._learning_rate = learning_rate; self._num_train_epochs = num_train_epochs
         self._weight_decay = weight_decay
@@ -57,10 +81,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         #set_seed(rnd_seed)
         set_torch_np_random_rseed(rnd_seed)
 
-    def _init_temp_folder(self):
-        '''
-        Initialize temporary folder for the model training checkpoints.
-        '''
+    def _init_temp_folder(self) -> None:
+        """
+        Initialize the temporary folder for model training checkpoints.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if self._tmp_folder is None:
             self._tmp_folder_object = tempfile.TemporaryDirectory()
             self._tmp_folder = self._tmp_folder_object.name
@@ -68,7 +99,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
             assert Path(self._tmp_folder).exists() # todo do assert alway, create exception
         print(f'Temporary folder: {self._tmp_folder}')
 
-    def _cleanup_temp_folder(self):
+    def _cleanup_temp_folder(self) -> None:
+        """
+        Clean up the temporary folder used for model training checkpoints.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if hasattr(self, '_tmp_folder_object'):
             self._tmp_folder_object.cleanup()
             del self._tmp_folder_object
@@ -76,8 +117,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         else: # leave the user-specified tmp folder intact
             pass
 
-    def _init_train_args(self):
-        ''' Initialize huggingface TrainingArguments. '''
+    def _init_train_args(self) -> None:
+        """
+        Initialize Hugging Face TrainingArguments for model training.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if self._eval is None:
             save_params = {
                 'save_strategy' : 'no',
@@ -104,20 +154,32 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         )
 
     @abstractmethod
-    def fit(self, X, y):
-        '''
-        :param X: list-like of texts
-        :param y: list-like of labels
-        :return:
-        '''
+    def fit(self, X: List[str], y: List[str]) -> None:
+        """
+        Train the model with the provided texts and labels.
+        
+        Args:
+            X (List[str]): List of texts for training.
+            y (List[str]): List of labels corresponding to the texts.
+
+        Returns:
+            None
+        """
+
         pass
 
     @abstractmethod
-    def predict(self, X):
-        '''
-        :param X: list-like of texts
-        :return: array of label predictions
-        '''
+    def predict(self, X: List[str]) -> np.ndarray:
+        """
+        Predict the labels of the provided texts.
+        
+        Args:
+            X (List[str]): List of texts to be classified.
+
+        Returns:
+            np.ndarray: Array of predicted labels.
+        """
+
         pass
 
     def __del__(self):
@@ -135,10 +197,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
     def device(self, dev):
         self._device = dev
 
-    def save(self, output_dir):
+    def save(self, output_dir: str) -> None:
         """
         Save the model, tokenizer, and class configuration to the output directory.
+        
+        Args:
+            output_dir (str): Directory to save the model and tokenizer.
+
+        Returns:
+            None
         """
+
         if not os.path.exists(output_dir): os.makedirs(output_dir)
         # save model and tokenizer
         #model_path = os.path.join(output_dir, 'pytorch_model.bin')
@@ -149,10 +218,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
 
     ATTRIBUTES_FILE_NAME = 'class_attributes.pkl'
 
-    def save_class_attributes(self, output_dir):
+    def save_class_attributes(self, output_dir: str) -> None:
         """
         Save the class attributes to the output directory, excluding 'model' and 'tokenizer'.
+        
+        Args:
+            output_dir (str): Directory to save the class attributes.
+
+        Returns:
+            None
         """
+
         attributes_path = os.path.join(output_dir, self.ATTRIBUTES_FILE_NAME)
         # Save class attributes except 'model' and 'tokenizer'
         # TODO add non-serializable attributes to the list, enable sub-class customization
@@ -163,10 +239,17 @@ class SklearnTransformerBase(metaclass=ABCMeta):
             pickle.dump(attributes_to_save, attributes_file)
 
     @classmethod
-    def load_class_attributes(cls, input_dir):
+    def load_class_attributes(cls, input_dir: str) -> 'SklearnTransformerBase':
         """
         Load class attributes from the specified directory, excluding 'model' and 'tokenizer'.
+        
+        Args:
+            input_dir (str): Directory to load the class attributes from.
+
+        Returns:
+            SklearnTransformerBase: Instance of the class with loaded attributes.
         """
+
         attributes_path = os.path.join(input_dir, cls.ATTRIBUTES_FILE_NAME)
         with open(attributes_path, 'rb') as attributes_file:
             attributes = pickle.load(attributes_file)
@@ -175,21 +258,37 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         return instance
 
 class SklearnTransformerClassif(SklearnTransformerBase):
-    '''
-    Adapter of hugginface transformers to scikit-learn interface.
+    """
+    Adapter of Hugging Face transformers to scikit-learn interface.
     The workflow is load model, fine-tune, apply and/or save.
-    '''
+    """
 
-    def _init_tokenizer_params(self):
+    def _init_tokenizer_params(self) -> None:
+        """
+        Initialize tokenizer parameters for truncation and maximum sequence length.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         if not hasattr(self, 'tokenizer_params'):
             self.tokenizer_params = {'truncation': True}
             if self._max_seq_length is not None: self.tokenizer_params['max_length'] = self._max_seq_length
 
-    def _init_model(self, num_classes):
-        '''
+    def _init_model(self, num_classes: int) -> None:
+        """
         Load model and tokenizer for classification fine-tuning.
-        :return:
-        '''
+        
+        Args:
+            num_classes (int): Number of classes for the classification task.
+
+        Returns:
+            None
+        """
+
         # load and init tokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(self._hf_model_label)
         self._init_tokenizer_params()
@@ -197,14 +296,32 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         self.model = AutoModelForSequenceClassification.from_pretrained(
                         self._hf_model_label, num_labels=num_classes).to(self._device)
 
-    def set_string_labels(self, labels: List[str]):
-        ''' Set 1-1 mapping between string labels and corresponding integer indices.
-        For binary classification, the labels therefore should be ['NEGATIVE LABEL', 'POSITIVE LABEL'].'''
+    def set_string_labels(self, labels: List[str]) -> None:
+        """
+        Set a 1-to-1 mapping between string labels and corresponding integer indices.
+        For binary classification, the labels therefore should be ['NEGATIVE LABEL', 'POSITIVE LABEL'].
+
+        Args:
+            labels (List[str]): List of string labels for the classification task.
+
+        Returns:
+            None
+        """
+
         assert len(labels) == len(set(labels)) # assert that the labels are unique
         self._str_labels = labels
 
-    def _init_classes(self, labels):
-        ''' Init class label data from the labels of the training set. '''
+    def _init_classes(self, labels: List[str]) -> None:
+        """
+        Initialize class label data from the labels of the training set.
+        
+        Args:
+            labels (List[str]): List of labels from the training set.
+
+        Returns:
+            None
+        """
+
         if not hasattr(self, '_str_labels'): # induce labels from the input list of (train) labels
             self._class_labels = sorted(list(set(l for l in labels)))
         else:
@@ -213,18 +330,44 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         self._cls_ix2label = { ix: l for ix, l in enumerate(self._class_labels) }
         self._cls_label2ix = { l: ix for ix, l in enumerate(self._class_labels) }
 
-    def _labels2indices(self, labels):
-        ''' Map class labels in input format to numbers in [0, ... , NUM_CLASSES] '''
+    def _labels2indices(self, labels: List[str]) -> np.ndarray:
+        """
+        Map class labels in input format to numbers in [0, ... , NUM_CLASSES]
+
+        Args:
+            labels (List[str]): List of class labels.
+
+        Returns:
+            np.ndarray: Array of label indices.
+        """
+
         return np.array([ix for ix in map(lambda l: self._cls_label2ix[l], labels)])
 
-    def _indices2labels(self, indices):
-        ''' Map class indices in [0,...,NUM_CLASSES] to original class labels '''
+    def _indices2labels(self, indices: np.ndarray) -> np.ndarray:
+        """
+        Map class indices in [0,...,NUM_CLASSES] to original class labels
+
+        Args:
+            indices (np.ndarray): Array of label indices.
+
+        Returns:
+            np.ndarray: Array of class labels.
+        """
+
         return np.array([l for l in map(lambda ix: self._cls_ix2label[ix], indices)])
 
-    def _prepare_dataset(self, X, y):
-        '''
+    def _prepare_dataset(self, X: List[str], y: List[str]) -> DatasetDict:
+        """
         Convert fit() params to hugginface-compatible datasets.Dataset
-        '''
+
+        Args:
+            X (List[str]): List of texts for training.
+            y (List[str]): List of labels corresponding to the texts.
+
+        Returns:
+            DatasetDict: Hugging Face Dataset containing training and evaluation splits.
+        """
+
         int_labels = self._labels2indices(y)
         df = pd.DataFrame({'text': X, 'label': int_labels})
         if self._eval:
@@ -236,12 +379,18 @@ class SklearnTransformerClassif(SklearnTransformerBase):
             dset = datasets.Dataset.from_pandas(df)
         return dset
 
-    def fit(self, X, y):
-        '''
-        :param X: list-like of texts
-        :param y: list-like of labels
-        :return:
-        '''
+    def fit(self, X: List[str], y: List[str]) -> None:
+        """
+        Train the model with the provided texts and labels.
+        
+        Args:
+            X (List[str]): List of texts for training.
+            y (List[str]): List of labels corresponding to the texts.
+
+        Returns:
+            None
+        """
+
         # delete old model from tmp folder, if it exists
         self._init_classes(y)
         # model and tokenizer init
@@ -252,11 +401,17 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         # input txt formatting and tokenization
         # training
 
-    def predict(self, X):
-        '''
-        :param X: list-like of texts
-        :return: array of label predictions
-        '''
+    def predict(self, X: List[str]) -> np.ndarray:
+        """
+        Predict the labels of the provided texts.
+        
+        Args:
+            X (List[str]): List of texts to be classified.
+
+        Returns:
+            np.ndarray: Array of predicted labels.
+        """
+
         #todo X 2 pandas df, df to Dataset.from_pandas dset ? or simply from iterable ?
         dset = datasets.Dataset.from_list([{'text': txt} for txt in X])
         pipe = TextClassificationPipeline(model=self.model, tokenizer=self.tokenizer, device=self._device,
@@ -269,14 +424,34 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         pred = [int(r['label'][-1]) for r in result] # assumes *LABEL$N format
         return self._indices2labels(pred)
 
-    def tokenize(self, txt, **kwargs):
+    def tokenize(self, txt: str, **kwargs) -> dict:
+        """
+        Tokenize the input text using the model's tokenizer.
+        
+        Args:
+            txt (str): Input text to be tokenized.
+            **kwargs: Additional parameters for tokenization.
+
+        Returns:
+            dict: Tokenized input.
+        """
         self._init_tokenizer_params()
         # joint self.tokenizer_params and kwargs
         params = self.tokenizer_params.copy()
         for k, v in kwargs.items(): params[k] = v
         return self.tokenizer(txt, **params)
 
-    def _do_training(self, X, y):
+    def _do_training(self, X: List[str], y: List[str]) -> None:
+        """
+        Perform the training process for the model.
+        
+        Args:
+            X (List[str]): List of texts for training.
+            y (List[str]): List of labels corresponding to the texts.
+
+        Returns:
+            None
+        """
         torch.manual_seed(self._rnd_seed)
         def preprocess_function(examples):
             return self.tokenizer(examples['text'], **self.tokenizer_params)
@@ -302,9 +477,16 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         torch.cuda.empty_cache()
 
     @classmethod
-    def load(cls, input_dir, device=None):
+    def load(cls, input_dir: str, device: torch.device = None) -> 'SklearnTransformerClassif':
         """
         Load the model, tokenizer, and class configuration from the input directory.
+        
+        Args:
+            input_dir (str): Directory to load the model and tokenizer from.
+            device (torch.device, optional): Device to load the model onto. Default is None.
+
+        Returns:
+            SklearnTransformerClassif: Loaded model instance.
         """
         instance = cls.load_class_attributes(input_dir)
         # load tokenizer and model
@@ -317,8 +499,22 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         return instance
 
 
-def test_hf_wrapper(test_dset, model='bert-base-uncased', device='cuda:0', subsample=500, rnd_seed=4140, eval=0.1):
-    # prepare test dataset
+def test_hf_wrapper(test_dset: str, model: str = 'bert-base-uncased', device: str = 'cuda:0', subsample: int = 500, 
+                    rnd_seed: int = 4140, eval: float = 0.1) -> None:
+    """
+    Test Hugging Face transformer wrapper with a given dataset.
+    
+    Args:
+        test_dset (str): Dataset identifier from Hugging Face datasets library.
+        model (str, optional): Hugging Face model identifier. Default is 'bert-base-uncased'.
+        device (str, optional): Device for model training and evaluation. Default is 'cuda:0'.
+        subsample (int, optional): Number of samples to use for testing. Default is 500.
+        rnd_seed (int, optional): Random seed for reproducibility. Default is 4140.
+        eval (float, optional): Proportion of the training set used for evaluation. Default is 0.1.
+
+    Returns:
+        None
+    """    # prepare test dataset
     dset = load_dataset(test_dset)
     texts = np.array(dset['train']['text'])
     labels = np.array(dset['train']['label'])
@@ -339,5 +535,3 @@ def test_hf_wrapper(test_dset, model='bert-base-uncased', device='cuda:0', subsa
 
 if __name__ == '__main__':
     test_hf_wrapper(test_dset='imdb', subsample=100, eval=None)
-
-

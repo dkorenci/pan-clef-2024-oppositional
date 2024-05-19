@@ -1,5 +1,5 @@
 import json
-from typing import List, Tuple
+from typing import List, Tuple, Union
 
 import pandas as pd
 
@@ -8,12 +8,18 @@ from data_tools.dataset_utils import reconstruct_spacy_docs_from_json, BINARY_MA
 from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN
 
 
-def load_dataset_full(lang, format='docbin'):
-    '''
-    Load .json dataset and, optionally, convert it to .docbin format.
-    :param format: 'docbin' or 'json'
-    :return:
-    '''
+def load_dataset_full(lang: str, format: str = 'docbin') -> Union[List, str]:
+    """
+    Load a dataset in .json format and optionally convert it to .docbin format.
+
+    Args:
+        lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        format (str, optional): Format to load the dataset in ('docbin' or 'json'). Default is 'docbin'.
+
+    Returns:
+        Union[List, str]: Loaded dataset in the specified format.
+    """
+
     print(f'Loading official JSON {lang} dataset')
     if lang == 'en': fname = TRAIN_DATASET_EN
     elif lang == 'es': fname = TRAIN_DATASET_ES
@@ -26,15 +32,19 @@ def load_dataset_full(lang, format='docbin'):
     else: raise ValueError(f'Unknown format: {format}')
     return dataset
 
-def load_dataset_classification(lang, string_labels=False, positive_class='conspiracy'):
-    '''
-    Load official .json dataset and convert it to a format suitable for classification.
-    :param lang: 'en' or 'es'
-    :param string_labels: if True, return orig. string labels from json,
-            otherwise return binary labels, 0 for negative, 1 for positive class
-    :param positive_class: 'conspiracy' or 'critical'
-    :return: three pandas series: texts, binary classes (1 - positive, 0 - negative), text ids
-    '''
+def load_dataset_classification(lang: str, string_labels: bool = False, positive_class: str = 'conspiracy') -> Tuple[pd.Series, pd.Series, pd.Series]:
+    """
+    Load the official .json dataset and convert it to a format suitable for classification.
+
+    Args:
+        lang (str): Language of the dataset ('en' or 'es').
+        string_labels (bool, optional): If True, return original string labels from json, otherwise return binary labels. Default is False.
+        positive_class (str, optional): Positive class label used in training ('conspiracy' or 'critical'). Default is 'conspiracy'.
+
+    Returns:
+        Tuple[pd.Series, pd.Series, pd.Series]: Texts, binary classes (1 - positive, 0 - negative), and text ids as pandas Series.
+    """
+
     dataset = load_dataset_full(lang, format='json')
     # convert to a format suitable for classification
     texts = pd.Series([doc['text'] for doc in dataset])
@@ -48,14 +58,18 @@ def load_dataset_classification(lang, string_labels=False, positive_class='consp
     ids = pd.Series([doc['id'] for doc in dataset])
     return texts, classes, ids
 
-def calculate_json_dataset_stats(dset: List, label=''):
-    '''
-    Calculate and print the following statistics for the dataset:
-    number of documents, proportions of the text 'category' classes, proportions of the span annotation classes
-    (for each span category, calculate the proportion of documents that have at least one span of that category)
-    :param dset: dataset, in the format produced by docbin_to_json(), and loaded by load_official_dataset()
-    :return:
-    '''
+def calculate_json_dataset_stats(dset: List[dict], label: str = '') -> None:
+    """
+    Calculate and print the statistics for the dataset including number of documents, proportions of text 'category' classes, and span annotation classes.
+
+    Args:
+        dset (List[dict]): Dataset in the format produced by docbin_to_json() and loaded by load_official_dataset().
+        label (str, optional): Label for the dataset. Default is ''.
+
+    Returns:
+        None
+    """
+
     if label: print(f'STATISTICS FOR {label}')
     num_docs = len(dset)
     text_categ = [doc['category'] for doc in dset]
@@ -74,20 +88,34 @@ def calculate_json_dataset_stats(dset: List, label=''):
     print()
 
 def load_texts_and_ids_from_json(json_file: str) -> Tuple[List[str], List[str]]:
+    """
+    Load texts and ids from a .json file.
+
+    Args:
+        json_file (str): Path to the .json file.
+
+    Returns:
+        Tuple[List[str], List[str]]: Lists of texts and ids.
+    """
+
     with open(json_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
     texts = [item['text'] for item in data]
     ids = [item['id'] for item in data]
     return texts, ids
 
-def load_span_annotations_from_json(json_file: str, span_f1_format=True) -> List[List[dict]]:
-    '''
+def load_span_annotations_from_json(json_file: str, span_f1_format: bool = True) -> Union[dict, List[List[dict]]]:
+    """
     Load span annotations from a .json file.
-    :param span_f1_format: if True, the annotations are in the format used for span-F1 score calculation:
-            map of document ids to list of annotations, where each annotation is a range of character indices.
-            If False, return list of per-document annotations formatted as in the original .json file.
-    :return:
-    '''
+
+    Args:
+        json_file (str): Path to the .json file.
+        span_f1_format (bool, optional): If True, return annotations in the format used for span-F1 score calculation. Default is True.
+
+    Returns:
+        Union[dict, List[List[dict]]]: Annotations formatted for span-F1 calculation or as in the original .json file.
+    """
+
     with open(json_file, 'r', encoding='utf-8') as file:
         data = json.load(file)
     if span_f1_format:

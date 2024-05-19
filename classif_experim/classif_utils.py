@@ -1,12 +1,26 @@
 from functools import partial
+from typing import List
 
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, matthews_corrcoef
 
 f1_macro = partial(f1_score, average='macro')
 f1_binary = partial(f1_score, average='binary')
 
-def f1_score_negative_class(y_true, y_pred):
-    """ Calculate the F1 score for the negative class in a binary classification setting. """
+def f1_score_negative_class(
+        y_true: List[int], 
+        y_pred: List[int]
+    ) -> float:
+    """
+    Calculate the F1 score for the negative class in a binary classification setting.
+    
+    Args:
+        y_true (List[int]): True labels.
+        y_pred (List[int]): Predicted labels.
+
+    Returns:
+        float: F1 score for the negative class.
+    """
+
     assert set(y_true).issubset({0, 1})
     assert set(y_pred).issubset({0, 1})
     # Inverting the labels: 0 becomes 1 and 1 becomes 0
@@ -14,7 +28,19 @@ def f1_score_negative_class(y_true, y_pred):
     y_pred_inverted = [1 if label == 0 else 0 for label in y_pred]
     return f1_score(y_true_inverted, y_pred_inverted, average='binary')
 
-def classif_scores(setup='binary'):
+def classif_scores(
+        setup: str = 'binary'
+    ) -> dict:
+    """
+    Return a dictionary of scoring functions based on the setup.
+    
+    Args:
+        setup (str, optional): Type of scoring setup ('binary', 'multiclass', 'all', 'span-binary'). Default is 'binary'.
+
+    Returns:
+        dict: Dictionary of scoring functions.
+    """
+
     f1_macro = partial(f1_score, average='macro')
     f1_binary = partial(f1_score, average='binary')
     if setup == 'binary':

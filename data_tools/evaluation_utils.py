@@ -9,15 +9,19 @@ from classif_experim.classif_utils import classif_scores
 from data_tools.dataset_utils import BINARY_MAPPING_CRITICAL_POS, BINARY_MAPPING_CONSPIRACY_POS
 from evaluation import oppositional_evaluator
 
-
-def evaluate_classif_predictions(pred_file: str, gold_file: str, positive_class: str):
-    '''
+def evaluate_classif_predictions(pred_file: str, gold_file: str, positive_class: str) -> None:
+    """
     Evaluate the predictions in the pred_file against the gold_file.
-    :param pred_file: .json file with the predictions
-    :param gold_file: .json file with the gold labels
-    :param positive_class: 'conspiracy' or 'critical'
-    :return:
-    '''
+
+    Args:
+        pred_file (str): Path to the .json file with the predictions.
+        gold_file (str): Path to the .json file with the gold labels.
+        positive_class (str): The positive class label ('conspiracy' or 'critical').
+
+    Returns:
+        None
+    """
+
     with open(pred_file, 'r', encoding='utf-8') as file:
         pred_data = json.load(file)
     with open(gold_file, 'r', encoding='utf-8') as file:
@@ -43,11 +47,20 @@ def evaluate_classif_predictions(pred_file: str, gold_file: str, positive_class:
     scores_fmtd = "\n".join([f"{fname:10}: {f(gold_labels, pred_labels):.3f}" for fname, f in score_fns.items()])
     print(scores_fmtd)
 
-def run_official_evaluation_script(task, predictions, gold, outdir='.'):
-    '''
-    Run the official evaluation script with the given arguments, from the command line:
-    python oppositional_evaluator.py task --predictions predictions --gold gold --outdir outdir
-    '''
+def run_official_evaluation_script(task: str, predictions: str, gold: str, outdir: str = '.') -> None:
+    """
+    Run the official evaluation script with the given arguments.
+
+    Args:
+        task (str): The evaluation task.
+        predictions (str): Path to the predictions file.
+        gold (str): Path to the gold labels file.
+        outdir (str, optional): Directory to save the output. Default is '.'.
+
+    Returns:
+        None
+    """
+
     eval_script_path = oppositional_evaluator.__file__
     command = ['python', eval_script_path, task, '--predictions', predictions, '--gold', gold, '--outdir', outdir]
     process = subprocess.run(command, text=True, capture_output=True)

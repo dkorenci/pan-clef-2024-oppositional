@@ -3,7 +3,7 @@ from spacy.attrs import ORTH
 from spacy.tokens import Doc, Token
 from urllib.parse import urlparse
 import regex as re
-from typing import Union
+from typing import List, Tuple, Union
 
 URL_REGEX = r'^[\w-]+(\.[\w-]+)+'
 
@@ -32,7 +32,17 @@ HASHTAG_PATTERN = r'^(#)([\p{L}0-9_]+)$' # hashtags, with all unicode letters
 
 MENTION_PATTERN = r'^(@)([\p{L}0-9_]+)$'  # Matches mentions according to Twitter's specifications
 
-def is_underscored_text(s):
+def is_underscored_text(s: str) -> Tuple[bool, List[str]]:
+    """
+    Check if the text contains underscores and split into tokens.
+
+    Args:
+        s (str): Input text.
+
+    Returns:
+        Tuple[bool, List[str]]: Whether the text contains underscores and the list of tokens.
+    """
+
     pattern = r'^\p{L}[\p{L}\p{N}]*(_[\p{L}\p{N}]+)+$'
     # Check if the entire string matches the pattern
     if re.match(pattern, s, re.UNICODE):
@@ -44,16 +54,45 @@ def is_underscored_text(s):
 
     return False, []
 
-def unicode_code_points(s:str):
+def unicode_code_points(s: str) -> str:
+    """
+    Get the Unicode code points of a string.
+
+    Args:
+        s (str): Input string.
+
+    Returns:
+        str: Unicode code points of the string.
+    """
+
     return ';'.join([f"U+{ord(char):04X}" for char in s])
 
-def is_url(token: Union[str, Token]):
+def is_url(token: Union[str, Token]) -> bool:
+    """
+    Check if the token is a URL.
+
+    Args:
+        token (Union[str, Token]): Token to check.
+
+    Returns:
+        bool: True if the token is a URL, False otherwise.
+    """
+
     if isinstance(token, Token):
         return token.like_url or URL_PATTERN.match(token.text) #re.search(URL_REGEX, token.text)
     else: return URL_PATTERN.match(token) # re.search(URL_REGEX, token)
 
+def detect_hashtag_or_mention(text: str) -> Tuple[bool, Union[str, None], Union[str, None]]:
+    """
+    Detect if the text is a hashtag or mention.
 
-def detect_hashtag_or_mention(text):
+    Args:
+        text (str): Input text.
+
+    Returns:
+        Tuple[bool, Union[str, None], Union[str, None]]: Whether the text is a hashtag or mention, and the prefix and text.
+    """
+
     hashtag_match = re.match(HASHTAG_PATTERN, text)
     if hashtag_match: return True, hashtag_match.group(1), hashtag_match.group(2)
     mention_match = re.match(MENTION_PATTERN, text)
@@ -61,17 +100,37 @@ def detect_hashtag_or_mention(text):
     return False, None, None
 
 class SpacyURLTokenizer:
-    '''
+    """
     Spacy tokenizer that splits urls into subtokens, based on an existing Language object,
     it adds new tokens to the vocab from the url and url-like tokens.
     It also performs an analogous tokenization mentions and hashtags.
-    '''
+    """
 
-    def __init__(self, nlp):
+    def __init__(self, nlp: spacy.language.Language) -> None:
+        """
+        Initialize the SpacyURLTokenizer with a given spaCy language object.
+
+        Args:
+            nlp (spacy.language.Language): spaCy language object.
+
+        Returns:
+            None
+        """
+
         self.vocab = nlp.vocab
         self.original_tokenizer = nlp.tokenizer
 
-    def __call__(self, text):
+    def __call__(self, text: str) -> Doc:
+        """
+        Tokenize the input text using the spaCy tokenizer with URL, mention, and hashtag splitting.
+
+        Args:
+            text (str): Input text to be tokenized.
+
+        Returns:
+            Doc: Tokenized spaCy Doc object.
+        """
+
         doc = self.original_tokenizer(text)
         tokens_extended = [] # orig. tokens with new url, mention and hashtag subtokens
         new_tokens = [] # only newly added tokens
@@ -102,19 +161,48 @@ class SpacyURLTokenizer:
         # create new doc with extended tokens
         return Doc(self.vocab, words=tokens_extended)
 
-def tokenize_url_subpart(subpart):
-    ''' Universal solution to tokenize either netloc, path, or query part of an url:
-        split into sequences of alphanumerics, and non-alphanumerics,
-        with '_' needing to be defined as non-alpha separately
-     '''
+def tokenize_url_subpart(subpart: str) -> List[str]:
+    """
+    Tokenize a URL subpart into sequences of alphanumerics and non-alphanumerics.
+    Universal solution to tokenize either netloc, path, or query part of an url:
+    split into sequences of alphanumerics, and non-alphanumerics,
+    with '_' needing to be defined as non-alpha separately
+
+    Args:
+        subpart (str): URL subpart to tokenize.
+
+    Returns:
+        List[str]: List of tokens.
+    """
+
     return re.findall(r'[\p{L}0-9]+|_+|[^\p{L}0-9_]+', subpart)
 
-def is_email(s):
+def is_email(s: str) -> bool:
+    """
+    Check if the string is a valid email address.
+
+    Args:
+        s (str): Input string.
+
+    Returns:
+        bool: True if the string is a valid email address, False otherwise.
+    """
+
     # A basic email validation pattern (not exhaustive but should work for many common email addresses)
     email_pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
     return bool(re.match(email_pattern, s))
 
-def tokenize_url(url: str):
+def tokenize_url(url: str) -> List[str]:
+    """
+    Tokenize a URL into its components.
+
+    Args:
+        url (str): URL to tokenize.
+
+    Returns:
+        List[str]: List of URL components as tokens.
+    """
+
     # check if the url starts with any scheme: a sequence of letters followed by ://
     scheme_added = False
     if not re.match(r'^\w+://', url):
@@ -154,16 +242,34 @@ url_test_sentences = [
     "This subreddit includes posts from all over Reddit: https://www.reddit.com/r/all/this-subreddit_includes.posts.from.all.over.reddit"
 ]
 
+def add_splitting_special_tok_cases(nlp: spacy.language.Language) -> None:
+    """
+    Define special token cases for splitting specific strings.
 
-def add_splitting_special_tok_cases(nlp):
+    Args:
+        nlp (spacy.language.Language): spaCy language object.
+
+    Returns:
+        None
+    """
+
     # define cases when a string should be split in two: (string, split after char index)
     cases = [('):', 1)]
     for s, ci in cases:
         special_case = [{ORTH: s[:ci]}, {ORTH: s[ci:]}]
         nlp.tokenizer.add_special_case(s, special_case)
 
+def customize_spacy_tokenizer(nlp: spacy.language.Language) -> None:
+    """
+    Customize the spaCy tokenizer with additional prefixes, infixes, and suffixes.
 
-def customize_spacy_tokenizer(nlp):
+    Args:
+        nlp (spacy.language.Language): spaCy language object.
+
+    Returns:
+        None
+    """
+
     prefixes = nlp.Defaults.prefixes + ['•', '-', '~', '\u200C\u200B\u200C', '‘’', r'\[\*', r'\u200C\u200C', r'\(',
                                         r'\[', '"']
     prefix_regex = spacy.util.compile_prefix_regex(prefixes)

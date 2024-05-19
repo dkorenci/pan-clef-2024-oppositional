@@ -8,13 +8,23 @@ from data_tools.dataset_utils import binary_labels_to_str, save_text_category_pr
 from data_tools.evaluation_utils import run_official_evaluation_script
 from settings import TEST_DATASET_EN, TEST_DATASET_ES
 
-
-def evaluate_on_test_dataset(model: SklearnTransformerClassif, lang: str, positive_class: str):
-    '''
+def evaluate_on_test_dataset(
+        model: SklearnTransformerClassif, 
+        lang: str, 
+        positive_class: str
+    ) -> None:
+    """
     Applies the model to the test dataset and evaluates the predictions using the official evaluation script.
-    :param positive_class: 'conspiracy' or 'critical', depending on how the model was trained
-    :return:
-    '''
+    
+    Args:
+        model (SklearnTransformerClassif): The classification model to be evaluated.
+        lang (str): Language of the test dataset ('en' for English, 'es' for Spanish).
+        positive_class (str): The positive class label ('conspiracy' or 'critical') used for prediction formatting.
+
+    Returns:
+        None
+    """
+
     test_fname = TEST_DATASET_EN if lang == 'en' else TEST_DATASET_ES
     txt, ids = load_texts_and_ids_from_json(test_fname)
     cls_pred = model.predict(txt)
@@ -23,7 +33,21 @@ def evaluate_on_test_dataset(model: SklearnTransformerClassif, lang: str, positi
     save_text_category_predictions_to_json(ids, cls_pred, pred_fname)
     run_official_evaluation_script('task1', pred_fname, test_fname)
 
-def build_eval_model(lang, positive_class='conspiracy'):
+def build_eval_model(
+        lang: str, 
+        positive_class: str = 'conspiracy'
+    ) -> None:
+    """
+    Builds or loads a full training classification model and evaluates it on the test dataset.
+    
+    Args:
+        lang (str): Language of the model and dataset ('en' for English, 'es' for Spanish).
+        positive_class (str, optional): The positive class label used for model training. Default is 'conspiracy'.
+
+    Returns:
+        None
+    """
+
     hf_model_id = 'bert-base-cased' if lang == 'en' else 'dccuchile/bert-base-spanish-wwm-cased'
     model = load_or_build_classif_fulltrain_model(lang, hf_model_id, model_label='bert-baseline',
                                               positive_class=positive_class)
@@ -31,5 +55,3 @@ def build_eval_model(lang, positive_class='conspiracy'):
 
 if __name__ == '__main__':
     build_eval_model('en')
-
-

@@ -1,7 +1,7 @@
-'''
+"""
 Functionality for converting the span annotation from internal formats (spacy docs, lists of span tuples)
 to huggingface format (datasets.Dataset objects).
-'''
+"""
 import random
 from typing import List, Tuple
 
@@ -14,15 +14,29 @@ from data_tools.spacy_utils import get_doc_id
 from data_tools.span_data_definitions import NONE_LABEL, LABEL_DEF
 
 
-def extract_spans(docs, spans_list, downsample_empty=None, rnd_seed=42, verbose=False,
-                    label_set=LABEL_DEF, none_label=NONE_LABEL):
-    '''
+def extract_spans(docs: List[Doc], spans_list: List[List[Tuple[str, int, int, str]]], 
+                  downsample_empty: float = None, rnd_seed: int = 42, verbose: bool = False,
+                  label_set: dict = LABEL_DEF, none_label: str = NONE_LABEL) -> dict:
+    """
     Extract spans from spacy docs and span tuples.
     Return a map from label to list of (doc, span_indices_list) tuples.
     A document can have multiple spans of the same label, and can have multiple labels.
     If a label is not present for a document, it will be put in the map with an empty list,
     therefore a document will occur in the map for each label, not only the present ones.
-    '''
+    
+    Args:
+        docs (List[Doc]): List of spaCy Doc objects.
+        spans_list (List[List[Tuple[str, int, int, str]]]): List of span annotations.
+        downsample_empty (float, optional): Ratio for downsampling empty documents. Default is None.
+        rnd_seed (int, optional): Random seed for downsampling. Default is 42.
+        verbose (bool, optional): Flag for verbose output. Default is False.
+        label_set (dict, optional): Set of labels to consider. Default is LABEL_DEF.
+        none_label (str, optional): Label for empty spans. Default is NONE_LABEL.
+
+    Returns:
+        dict: Map from label to list of (doc, span_indices_list) tuples.
+    """
+
     data = { l: [] for l in label_set }
     for doc, spans in zip(docs, spans_list):
         # local dictionary to group spans by label for the current doc
@@ -52,24 +66,48 @@ def extract_spans(docs, spans_list, downsample_empty=None, rnd_seed=42, verbose=
         data[label] = empty_entries + non_empty_entries
     return data
 
-def spanannot_tags_classlabel(task_label: str):
-    ''' Define hf Dataset ClassLabel for a single span label, constructs string tags,
-        integer indices, and the mappings between them.'''
+def spanannot_tags_classlabel(task_label: str) -> ClassLabel:
+    """
+    Define hf Dataset ClassLabel for a single span label, constructs string tags,
+    integer indices, and the mappings between them.
+    
+    Args:
+        task_label (str): Task label.
+
+    Returns:
+        ClassLabel: Hugging Face ClassLabel object.
+    """
     return ClassLabel(names=['O', f'B-{task_label}', f'I-{task_label}'])
 
-def spanannot_feature_definition(label):
-    ''' Define the hf Dataset Features for a single span label. '''
+def spanannot_feature_definition(label: str) -> Features:
+    """
+    Define the HF Dataset Features for a single span label.
+
+    Args:
+        label (str): Span label.
+
+    Returns:
+        Features: Hugging Face Features object.
+    """
+
     Features({
         'tokens': Sequence(feature=Value(dtype='string'), length=-1),
         'ner_tags': Sequence(feature=spanannot_tags_classlabel(label), length=-1)
     })
 
-def convert_to_hf_format(label, data: List[Tuple[Doc, List[Tuple[int, int]]]]) -> Dataset:
-    '''
+def convert_to_hf_format(label: str, data: List[Tuple[Doc, List[Tuple[int, int]]]]) -> Dataset:
+    """
     Create hf-compatible dataset from a list of (doc, span_indices_list) tuples, in BIO format,
     for a single label - tokens of each doc are assigned BIO tags according to the span indices.
-    :return: huggingface Dataset
-    '''
+    
+    Args:
+        label (str): Span label.
+        data (List[Tuple[Doc, List[Tuple[int, int]]]]): List of (doc, span_indices_list) tuples.
+
+    Returns:
+        Dataset: Hugging Face Dataset object.
+    """
+
     formatted_data = {
         'text_ids': [],
         'tokens': [],
@@ -90,32 +128,55 @@ def convert_to_hf_format(label, data: List[Tuple[Doc, List[Tuple[int, int]]]]) -
         formatted_data['text_ids'].append(get_doc_id(doc))
     return Dataset.from_dict(formatted_data, features=spanannot_feature_definition(label))
 
-def labels_from_predictions(preds, tok_indices, task_label: str):
-    '''
+def labels_from_predictions(preds: np.ndarray, tok_indices: List[int], task_label: str) -> List[str]:
+    """
     For a specific seq. label task, convert the model's predictions to string BIO labels.
-    :param preds: matrix of logits or probabilites, shape (num_tokens, num_labels)
-    :param tok_indices: huggingface token indices
-    '''
+    
+    Args:
+        preds (np.ndarray): Matrix of logits or probabilities, shape (num_tokens, num_labels).
+        tok_indices (List[int]): Hugging Face token indices.
+        task_label (str): Task label.
+
+    Returns:
+        List[str]: List of BIO labels.
+    """
+
     task_tags = spanannot_tags_classlabel(task_label) # definition of tasks's labels (string and int index)
     predictions = np.argmax(preds, axis=1) # predict the label with the highest probability
     labels = [task_tags.int2str(int(p)) for (p, l) in zip(predictions, tok_indices) if l != -100]
     return labels
 
-def align_labels_with_tokens(tokens, labels):
-    '''
+def align_labels_with_tokens(tokens: List[str], labels: List[str]) -> List[str]:
+    """
     If the orig. tokens are longer then the model's predicted labels,
     add 'O' labels to the end to make the lengths equal.
-    '''
+    
+    Args:
+        tokens (List[str]): List of tokens.
+        labels (List[str]): List of labels.
+
+    Returns:
+        List[str]: Aligned labels.
+    """
+
     N = len(tokens)
     assert len(labels) <= N
     labels = labels + ['O'] * (N - len(labels))
     return labels
 
-def extract_span_ranges(tokens: List[str], bio_tags: List[str], allow_hanging_itag=False) -> List[Tuple[int, int]]:
-    '''
+def extract_span_ranges(tokens: List[str], bio_tags: List[str], allow_hanging_itag: bool = False) -> List[Tuple[int, int]]:
+    """
     Extract the span ranges (token indices) from a list of tokens and BIO tags.
-    :return:
-    '''
+    
+    Args:
+        tokens (List[str]): List of tokens.
+        bio_tags (List[str]): List of BIO tags.
+        allow_hanging_itag (bool, optional): Flag to allow hanging 'I-' tags. Default is False.
+
+    Returns:
+        List[Tuple[int, int]]: List of span ranges.
+    """
+
     span_ranges = []
     current_span = None
     for i, (token, tag) in enumerate(zip(tokens, bio_tags)):
@@ -142,6 +203,10 @@ def extract_span_ranges(tokens: List[str], bio_tags: List[str], allow_hanging_it
     return span_ranges
 
 def test_extract_span_ranges():
+    """
+    Run test cases to validate the extraction of span ranges.
+    """
+
     # Test case 1: Basic case with entities
     tokens1 = ["This", "is", "an", "example", "sentence", "about", "New", "York", "City", "."]
     bio_tags1 = ["B-L", "I-L", "I-L", "O", "O", "B-L", "I-L", "B-L", "I-L", "I-L"]
@@ -195,6 +260,10 @@ def test_extract_span_ranges():
     print("All test cases passed!")
 
 def test_conversion():
+    """
+    Run test cases to validate the conversion of data to Hugging Face format.
+    """
+
     nlp = spacy.load("en_core_web_sm")
 
     # Sample texts in English related to COVID vaccines, with mock annotations.

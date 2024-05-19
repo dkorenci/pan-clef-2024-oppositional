@@ -10,17 +10,52 @@ from classif_experim.classif_utils import classif_scores
 from classif_experim.hf_skelarn_wrapper import SklearnTransformerClassif
 from data_tools.dataset_loaders import load_dataset_classification
 
+def build_transformer_model(
+        model_label: str, 
+        model_hparams: dict,
+        rnd_seed: int
+    ) -> SklearnTransformerClassif:
+    """
+    Factory method for building a sklearn-wrapped transformer model.
+    
+    Args:
+        model_label (str): Identifier for the Hugging Face transformer model.
+        model_hparams (dict): Hyperparameters for the model training.
+        rnd_seed (int): Random seed for reproducibility.
 
-def build_transformer_model(model_label, model_hparams, rnd_seed):
-    ''' Factory method for building a sklearn-wrapped transformer model.'''
+    Returns:
+        SklearnTransformerClassif: An instance of the SklearnTransformerClassif model.
+    """
+
     return SklearnTransformerClassif(hf_model_label=model_label, **model_hparams, rnd_seed=rnd_seed)
 
+def run_classif_crossvalid(
+        lang: str,
+        model_label: str, 
+        model_params: dict,
+        positive_class: str = 'critical', 
+        num_folds: int = 5,
+        rnd_seed: int = 3154561, 
+        test: bool = False, 
+        pause_after_fold: int = 0
+    ) -> dict:
+    """
+    Run k-fold cross-validation for a given model and report the results.
+    
+    Args:
+        lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        model_label (str): Identifier for the Hugging Face transformer model.
+        model_params (dict): Hyperparameters for the model training.
+        positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
+        num_folds (int, optional): Number of folds for cross-validation. Default is 5.
+        rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
+        test (bool, optional): If true, use a subset of the data for testing. Default is False.
+        pause_after_fold (int, optional): Minutes to pause after each fold. Default is 0.
 
-def run_classif_crossvalid(lang, model_label, model_params, positive_class='critical', num_folds=5,
-                           rnd_seed=3154561, test=False, pause_after_fold=0):
-    '''
-    Run x-fold crossvalidation for a given model, and report the results.
-    '''
+    Returns:
+        dict: Dictionary mapping text IDs to class predictions.
+    """
+
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
     score_fns = classif_scores('all')
     texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class)
@@ -97,7 +132,19 @@ HF_CORE_HPARAMS = {
 DEFAULT_RND_SEED = 564671
 
 logger = None
-def setup_logging(log_filename):
+def setup_logging(
+        log_filename: str
+    ) -> None:
+    """
+    Sets up logging to a file and console.
+    
+    Args:
+        log_filename (str): Filename for the log file.
+
+    Returns:
+        None
+    """
+
     global logger
     logging.basicConfig(
         level=logging.INFO,  # Log INFO level and above
@@ -108,13 +155,37 @@ def setup_logging(log_filename):
     )
     logger = logging.getLogger('')
 
-def run_classif_experiments(lang, num_folds, rnd_seed, test=False, experim_label=None,
-                            pause_after_fold=0, pause_after_model=0, max_seq_length=MAX_SEQ_LENGTH,
-                            positive_class='critical', model_list=None):
-    '''
-    :param positive_class: 'critical' or 'conspiracy'
-    :return:
-    '''
+def run_classif_experiments(
+        lang: str, 
+        num_folds: int, 
+        rnd_seed: int, 
+        test: bool = False, 
+        experim_label: str = None,
+        pause_after_fold: int = 0, 
+        pause_after_model: int = 0, 
+        max_seq_length: int = MAX_SEQ_LENGTH,
+        positive_class: str = 'critical', 
+        model_list: list = None
+    ) -> dict:
+    """
+    Run classification experiments, testing different models and configurations.
+    
+    Args:
+        lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        num_folds (int): Number of folds for cross-validation.
+        rnd_seed (int): Random seed for reproducibility.
+        test (bool, optional): If true, use a subset of the data for testing. Default is False.
+        experim_label (str, optional): Label for the experiment. Default is None.
+        pause_after_fold (int, optional): Minutes to pause after each fold. Default is 0.
+        pause_after_model (int, optional): Minutes to pause after each model. Default is 0.
+        max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
+        positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
+        model_list (list, optional): List of model identifiers to test. Default is None.
+
+    Returns:
+        dict: Dictionary mapping model identifiers to prediction results.
+    """
+
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     experim_label = f'{experim_label}_rseed_{rnd_seed}' if experim_label else f'rseed_{rnd_seed}'
     log_filename = f"classification_experiments_{experim_label}_{timestamp}.log"
@@ -157,7 +228,21 @@ def run_classif_experiments(lang, num_folds, rnd_seed, test=False, experim_label
             time.sleep(pause_after_model * 60)
     return pred_res
 
-def run_all_critic_conspi(seed=DEFAULT_RND_SEED, langs=['en', 'es']):
+def run_all_critic_conspi(
+        seed: int = DEFAULT_RND_SEED, 
+        langs: list = ['en', 'es']
+    ) -> None:
+    """
+    Run classification experiments for multiple languages and classes.
+    
+    Args:
+        seed (int, optional): Random seed for reproducibility. Default is DEFAULT_RND_SEED.
+        langs (list, optional): List of languages to test. Default is ['en', 'es'].
+
+    Returns:
+        None
+    """
+
     for lang in langs:
         run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
                                 positive_class='critical', pause_after_fold=1,
@@ -165,4 +250,3 @@ def run_all_critic_conspi(seed=DEFAULT_RND_SEED, langs=['en', 'es']):
 
 if __name__ == '__main__':
     run_all_critic_conspi()
-

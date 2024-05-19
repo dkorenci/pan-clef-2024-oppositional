@@ -9,9 +9,14 @@ Computing of the adapted version F1 score for matching possibly overlapping span
 
 import logging
 import sys
+from typing import Tuple
 
 logger = None
 def init_logger():
+    """
+    Initialize the logger for the span F1 scorer.
+    """
+
     global logger
     if logger is None:
         logger = logging.getLogger("span_f1_scorer")
@@ -22,8 +27,24 @@ def init_logger():
         logger.setLevel(logging.DEBUG)
         logger.addHandler(ch)
 
-def compute_score_pr(submission_annotations, gold_annotations, technique_names, prop_vs_non_propaganda=False,
-                     per_article_evaluation=False, disable_logger=True):
+def compute_score_pr(submission_annotations: dict, gold_annotations: dict, technique_names: list, 
+                     prop_vs_non_propaganda: bool = False, per_article_evaluation: bool = False, 
+                     disable_logger: bool = True) -> dict:
+    """
+    Compute precision, recall, and F1 score for span annotations.
+
+    Args:
+        submission_annotations (dict): Submitted annotations.
+        gold_annotations (dict): Gold standard annotations.
+        technique_names (list): List of technique names.
+        prop_vs_non_propaganda (bool, optional): Flag for considering propaganda vs non-propaganda. Default is False.
+        per_article_evaluation (bool, optional): Flag for per article evaluation. Default is False.
+        disable_logger (bool, optional): Flag to disable logger. Default is True.
+
+    Returns:
+        dict: A dictionary containing precision, recall, and F1 score for each technique.
+    """
+
     init_logger()
     if disable_logger: logger.setLevel(logging.CRITICAL)
     prec_denominator = sum([len(annotations) for annotations in submission_annotations.values()])
@@ -86,7 +107,21 @@ def compute_score_pr(submission_annotations, gold_annotations, technique_names, 
     return result
 
 
-def compute_prec_rec_f1(prec_numerator, prec_denominator, rec_numerator, rec_denominator, print_results=True):
+def compute_prec_rec_f1(prec_numerator: float, prec_denominator: int, rec_numerator: float, 
+                        rec_denominator: int, print_results: bool = True) -> Tuple[float, float, float]:
+    """
+    Compute precision, recall, and F1 score.
+
+    Args:
+        prec_numerator (float): Numerator for precision.
+        prec_denominator (int): Denominator for precision.
+        rec_numerator (float): Numerator for recall.
+        rec_denominator (int): Denominator for recall.
+        print_results (bool, optional): Flag to print results. Default is True.
+
+    Returns:
+        Tuple[float, float, float]: Precision, recall, and F1 score.
+    """
 
     logger.debug("P=%f/%d, R=%f/%d"%(prec_numerator, prec_denominator, rec_numerator, rec_denominator))
     p, r, f1 = (0, 0, 0)
@@ -104,6 +139,17 @@ def compute_prec_rec_f1(prec_numerator, prec_denominator, rec_numerator, rec_den
         logger.info("F1=%f" % (f1))
     return p,r,f1
 
-def compute_technique_frequency(annotations_list, technique_name):
+def compute_technique_frequency(annotations_list: list, technique_name: str) -> int:
+    """
+    Compute the frequency of a specific technique in the annotations.
+
+    Args:
+        annotations_list (list): List of annotations.
+        technique_name (str): Name of the technique.
+
+    Returns:
+        int: Frequency of the technique.
+    """
+
     return sum([ len([ example_annotation for example_annotation in x if example_annotation[0]==technique_name])
                  for x in annotations_list ])

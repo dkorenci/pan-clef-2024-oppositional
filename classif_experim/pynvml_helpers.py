@@ -5,7 +5,21 @@ From: https://huggingface.co/docs/transformers/perf_train_gpu_one
 from pynvml import *
 import torch
 
-def print_gpu_utilization(tag='', device=0):
+def print_gpu_utilization(
+        tag: str = '', 
+        device: int = 0
+    ) -> None:
+    """
+    Print the amount of GPU memory used.
+    
+    Args:
+        tag (str, optional): Tag to include in the print statement. Default is ''.
+        device (int, optional): GPU device index. Default is 0.
+
+    Returns:
+        None
+    """
+
     nvmlInit()
     handle = nvmlDeviceGetHandleByIndex(device)
     info = nvmlDeviceGetMemoryInfo(handle)
@@ -16,7 +30,17 @@ def print_summary(result):
     print(f"Samples/second: {result.metrics['train_samples_per_second']:.2f}")
     print_gpu_utilization()
 
-def print_cuda_devices():
+def print_cuda_devices() -> None:
+    """
+    Print information about available CUDA devices.
+    
+    Args:
+        None
+
+    Returns:
+        None
+    """
+
     nvmlInit()
     if torch.cuda.is_available():
         print("CUDA Devices:")

@@ -17,25 +17,45 @@ from sequence_labeling.multi_task_model import MultiTaskModel, Task
 from sequence_labeling.spanannot2hf import extract_spans, convert_to_hf_format, labels_from_predictions, \
     align_labels_with_tokens, extract_span_ranges
 
-
 class OppSequenceLabelerMultitask(SklearnTransformerBase):
-    '''
+    """
     'Oppositional Sequence Labeler', wraps the data transformation functionality and the multitask HF model
     for sequence labeling into a sklearn-like interface.
-    '''
+    """
 
-    def __init__(self, task_labels, task_indices, empty_label_ratio=0.2, loss_freq_weights=False, task_importance=None, **kwargs):
+    def __init__(self, task_labels: List[str], task_indices: Dict[str, int], empty_label_ratio: float = 0.2, loss_freq_weights: bool = False, task_importance: Dict[str, float] = None, **kwargs) -> None:
+        """
+        Initialize the OppSequenceLabelerMultitask.
+
+        Args:
+            task_labels (List[str]): List of task labels.
+            task_indices (Dict[str, int]): Dictionary mapping task labels to task indices.
+            empty_label_ratio (float, optional): Ratio of empty labels. Default is 0.2.
+            loss_freq_weights (bool, optional): Whether to use frequency-based loss weights. Default is False.
+            task_importance (Dict[str, float], optional): Dictionary of task importance weights. Default is None.
+            **kwargs: Additional arguments for the superclass.
+
+        Returns:
+            None
+        """
+
         super().__init__(**kwargs)
         self._empty_label_ratio = empty_label_ratio
         self._loss_freq_weights = loss_freq_weights
         self._task_importance = task_importance
         self.task_labels, self.task_indices = task_labels, task_indices
 
-    def dataset_stats(self, docs: List[Doc]):
-        '''
+    def dataset_stats(self, docs: List[Doc]) -> None:
+        """
         Calculate and print statistics of the transformed dataset that will be used for training.
-        :return:
-        '''
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+
+        Returns:
+            None
+        """
+
         old_eval = self._eval
         span_labels = [get_annoation_tuples_from_doc(doc) for doc in docs]
         self._eval = None # entire dataset will be the train set
@@ -48,8 +68,17 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         #self._cleanup_temp_folder()
         self._eval = old_eval
 
-    def _calc_dset_stats(self, verbose=False):
-        ''' Calculate and print dataset statistics using self._raw_train '''
+    def _calc_dset_stats(self, verbose: bool = False) -> None:
+        """
+        Calculate and print dataset statistics using self._raw_train.
+
+        Args:
+            verbose (bool, optional): Whether to print detailed statistics. Default is False.
+
+        Returns:
+            None
+        """
+
         if verbose: print(f'Seqlabel train dataset statistics for {self._lang}:')
         # use self._raw_train
         # for each label, count and print the number of instances, as well as the number of instances with no spans
@@ -66,13 +95,18 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
                 print(f'{label:<3}: {num_instances:<5} instances ({num_instances/num*100:5.3f}%) '
                     f'{num_empty:<5} empty ({num_empty/num*100:5.3f}%)')
 
-    def fit(self, docs: List[Doc], span_labels: List[Tuple[str, int, int, str]]):
-        '''
-        :param docs: spacy Docs
-        :param span_labels: list of lists of spans, span is a tuple of (label, start, end, text),
-                where start and end are token indices, ie, doc[start:end] is the span text
-        :return:
-        '''
+    def fit(self, docs: List[Doc], span_labels: List[Tuple[str, int, int, str]]) -> None:
+        """
+        Fit the model on the provided dataset.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+            span_labels (List[Tuple[str, int, int, str]]): List of lists of spans, each span is a tuple of (label, start, end, text).
+
+        Returns:
+            None
+        """
+
         self._init_tokenizer()
         self._construct_datasets_for_inference(docs, span_labels)
         self._init_model()
@@ -82,16 +116,31 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         # input txt formatting and tokenization
         # training
 
-    def fit_(self, docs: List[Doc]):
-        '''
-        Helper to enable fitting without previously extracting spans a separate list.
-        docs: spacy Docs, with annotated spans, in the format defined in 'create_spacy_span_dataset.py'
-        :return:
-        '''
+    def fit_(self, docs: List[Doc]) -> None:
+        """
+        Helper method to enable fitting without previously extracting spans into a separate list.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents with annotated spans.
+
+        Returns:
+            None
+        """
+
         span_labels = [get_annoation_tuples_from_doc(doc) for doc in docs]
         self.fit(docs, span_labels)
 
-    def _do_training(self):
+    def _do_training(self) -> None:
+        """
+        Perform the training process for the model.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         train_dataset = self._dataset['train']
         eval_dataset = self._dataset['eval'] if self._eval else None
         data_collator = DataCollatorForTokenClassification(self.tokenizer)
@@ -106,14 +155,35 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         del trainer
         torch.cuda.empty_cache()
 
-    def _construct_datasets_for_inference(self, docs, spans):
+    def _construct_datasets_for_inference(self, docs: List[Doc], spans: List[List[Tuple[str, int, int, str]]] = None) -> None:
+        """
+        Construct datasets for inference.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+            spans (List[List[Tuple[str, int, int, str]]], optional): List of spans for each document. Default is None.
+
+        Returns:
+            None
+        """
+
         self._construct_train_eval_raw_datasets(docs, spans)
         self._calc_dset_stats(verbose=False)
         #self._inspect_data(self._raw_train, self.span_labels, num_samples=5)
         self._hf_tokenize_task_dataset()
 
-    def _construct_train_eval_raw_datasets(self, docs, spans):
-        ''' Construct 'raw' datasets, but separately for train end eval. '''
+    def _construct_train_eval_raw_datasets(self, docs: List[Doc], spans: List[List[Tuple[str, int, int, str]]]) -> None:
+        """
+        Construct raw datasets for training and evaluation.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+            spans (List[List[Tuple[str, int, int, str]]]): List of spans for each document.
+
+        Returns:
+            None
+        """
+
         if self._eval:
             docs_train, docs_eval, spans_train, spans_eval = \
                 train_test_split(docs, spans, test_size=self._eval, random_state=self._rnd_seed)
@@ -123,10 +193,19 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
             self._raw_train = self._construct_raw_hf_dataset(docs, spans, downsample=self._empty_label_ratio)
             self._raw_eval = None
 
-    def _construct_raw_hf_dataset(self, docs, span_labels, downsample) -> Dict[str, Dataset]:
-        '''
-        Convert the data to HF format: create one HF dataset per label, in BIO format.
-        '''
+    def _construct_raw_hf_dataset(self, docs: List[Doc], span_labels: List[List[Tuple[str, int, int, str]]], downsample: float) -> Dict[str, Dataset]:
+        """
+        Convert the data to Hugging Face format: create one HF dataset per label in BIO format.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+            span_labels (List[List[Tuple[str, int, int, str]]]): List of spans for each document.
+            downsample (float): Downsample ratio for empty labels.
+
+        Returns:
+            Dict[str, Dataset]: Dictionary of HF datasets per label.
+        """
+
         data_by_label = extract_spans(docs, span_labels, downsample_empty=downsample, rnd_seed=self._rnd_seed,
                                       label_set=self.task_labels)
         datasets = {}
@@ -134,24 +213,50 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
             datasets[label] = convert_to_hf_format(label, data)
         return datasets
 
-    def _init_tokenizer(self):
+    def _init_tokenizer(self) -> None:
+        """
+        Initialize the tokenizer.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self.tokenizer = AutoTokenizer.from_pretrained(self._hf_model_label)
         if isinstance(self.tokenizer, transformers.RobertaTokenizerFast):
             self.tokenizer.add_prefix_space = True
         self.tokenizer_params = {'truncation': True}
         if self._max_seq_length is not None: self.tokenizer_params['max_length'] = self._max_seq_length
 
-    def _get_narrative_tasks(self):
-        '''
+    def _get_narrative_tasks(self) -> List[Task]:
+        """
         Definition of tasks for this sequence labeling problem, compatible with MultiTaskModel.
-        '''
+
+        Args:
+            None
+
+        Returns:
+            List[Task]: List of tasks for the model.
+        """
+
         return [
             Task(id=self.task_indices[task_id], name=None, num_labels=3, type="token_classification")
             for task_id in self.task_labels
         ]
 
-    def _calculate_task_weights(self):
-        ''' Calculate task weights from task frequencies and importance weights. '''
+    def _calculate_task_weights(self) -> None:
+        """
+        Calculate task weights from task frequencies and importance weights.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         def normalize_weight_map(weights):
             sum_weights = sum(weights.values())
             for label in self.task_labels: weights[self.task_indices[label]] /= sum_weights
@@ -169,16 +274,33 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
                 for label in self.task_labels: self._task_weights[self.task_indices[label]] = self._task_importance[label]
                 normalize_weight_map(self._task_weights)
 
-    def _init_model(self):
+    def _init_model(self) -> None:
+        """
+        Initialize the model.
+
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         self._calculate_task_weights()
         self._is_roberta = 'roberta' in self._hf_model_label.lower()
         self.model = MultiTaskModel(self._hf_model_label, self._get_narrative_tasks(), task_weights=self._task_weights).to(self._device)
 
-    def _hf_tokenize_task_dataset(self):
-        '''
+    def _hf_tokenize_task_dataset(self) -> None:
+        """
         Given a HF dataset for a single task (label) produced by _construct_hf_datasets,
         tokenize it, add taks labels, and return the tokenized dataset.
-        '''
+        
+        Args:
+            None
+
+        Returns:
+            None
+        """
+
         # for each label, perform hf tokenization
         raw_dset_per_label = {}
         for label in self.task_labels:
@@ -206,8 +328,23 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         else:
             self._dataset = datasets.DatasetDict({'train': merged_datasets['train'], 'eval': merged_datasets['eval']})
 
-    def _tokenize_token_classification_dataset(self, raw_datasets: Union[DatasetDict, Dataset], tokenizer, task_id,
-                                               text_column_name='tokens', label_column_name='ner_tags'):
+    def _tokenize_token_classification_dataset(self, raw_datasets: Union[DatasetDict, Dataset], 
+                                               tokenizer: AutoTokenizer, task_id: int, text_column_name: str = 'tokens', 
+                                               label_column_name: str = 'ner_tags') -> DatasetDict:
+        """
+        Tokenize the token classification dataset.
+
+        Args:
+            raw_datasets (Union[DatasetDict, Dataset]): Raw HF datasets.
+            tokenizer (AutoTokenizer): Tokenizer to use.
+            task_id (int): Task ID.
+            text_column_name (str, optional): Name of the text column. Default is 'tokens'.
+            label_column_name (str, optional): Name of the label column. Default is 'ner_tags'.
+
+        Returns:
+            DatasetDict: Tokenized HF datasets.
+        """
+
         def tokenize_and_align_labels(examples):
             tokenized_inputs = tokenizer(
                 examples[text_column_name],
@@ -242,7 +379,19 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         else: raise ValueError(f'Unknown dataset type: {type(raw_datasets)}')
         return tokenized_datasets
 
-    def _inspect_data(self, datasets, label_list, num_samples=10):
+    def _inspect_data(self, datasets: Dict[str, Dataset], label_list: List[str], num_samples: int = 10) -> None:
+        """
+        Inspect and print sample data for each label.
+
+        Args:
+            datasets (Dict[str, Dataset]): Dictionary of datasets per label.
+            label_list (List[str]): List of task labels.
+            num_samples (int, optional): Number of samples to inspect. Default is 10.
+
+        Returns:
+            None
+        """
+
         def print_aligned_tokens_and_tags(tokens, ner_tags):
             token_str = ' '.join([f"{token:<{len(token) + 2}}" for token in tokens])
             print(token_str)
@@ -268,7 +417,18 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
                 print_aligned_tokens_and_tags(tokens, labels)
             print("\n\n")
 
-    def _construct_predict_dataset(self, docs, spans=None):
+    def _construct_predict_dataset(self, docs: List[Doc], spans: List[List[Tuple[str, int, int, str]]] = None) -> Dict[str, Dataset]:
+        """
+        Construct the dataset for prediction.
+
+        Args:
+            docs (List[Doc]): List of SpaCy documents.
+            spans (List[List[Tuple[str, int, int, str]]], optional): List of spans for each document. Default is None.
+
+        Returns:
+            Dict[str, Dataset]: Dictionary of HF datasets per label for prediction.
+        """
+
         if spans == None: # no spans provided, create a list of #docs empty lists for compatibility
             spans = [[] for _ in range(len(docs))]
         raw_dset_per_label = self._construct_raw_hf_dataset(docs, spans, downsample=None)
@@ -280,10 +440,17 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         return tokenized_dset_per_label
 
     def predict(self, X: List[Doc]) -> List[List[Tuple[str, int, int, str]]]:
-        '''
-        :return: list of lists of spans (full annotations for one document); each span is a tuple of (label, start, end, author),
-            for the data to be in the same format as in the original spacy data
-        '''
+        """
+        Predict the spans for the given documents.
+
+        Args:
+            X (List[Doc]): List of SpaCy documents.
+
+        Returns:
+            List[List[Tuple[str, int, int, str]]]: List of lists of spans (full annotations for one document); 
+            each span is a tuple of (label, start, end, author), for the data to be in the same format as in the original spacy data
+        """
+
         text_labels_pred = {} # intermediate map with output, and the helper function for adding labels to it
         def add_labels_to_map(label_map, text_id, task_label, labels: List[str]):
             if text_id not in label_map: label_map[text_id] = {}
@@ -319,7 +486,6 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
                 spans = extract_span_ranges(tokens, span_bio_tags, allow_hanging_itag=True)
                 span_labels_pred[text_id].extend([(task_label, start, end, self._hf_model_label) for start, end in spans])
         return [span_labels_pred[get_doc_id(doc)] for doc in X]
-
 
 if __name__ == '__main__':
     pass

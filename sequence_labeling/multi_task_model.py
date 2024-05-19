@@ -12,7 +12,7 @@ would require some adaptation.
 
 import os
 from dataclasses import dataclass
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import torch
 from torch import nn
@@ -20,19 +20,36 @@ from transformers import AutoModel
 
 @dataclass
 class Task:
+    """
+    Data class representing a task for the multi-task model.
+
+    Attributes:
+        id (int): Task identifier.
+        name (str): Name of the task.
+        type (str): Type of the task ('seq_classification' or 'token_classification').
+        num_labels (int): Number of labels for the task.
+    """
+
     id: int
     name: str
     type: str
     num_labels: int
 
 class MultiTaskModel(nn.Module):
-    def __init__(self, encoder_name_or_path: str, tasks: List[Task], task_weights: Dict[int, float] = None):
-        '''
+    def __init__(self, encoder_name_or_path: str, tasks: List[Task], task_weights: Dict[int, float] = None) -> None:
+        """
         Multi task model using a transformer encoder backbone, and sequence labeling or classification heads.
         Currently the model is tested only for sequence labeling tasks.
-        :param encoder_name_or_path: huggingface model name or path to model
-        :param task_weights: task_id -> weight, for weighted loss
-        '''
+
+        Args:
+            encoder_name_or_path (str): Hugging Face model name or path to the model.
+            tasks (List[Task]): List of tasks for the model.
+            task_weights (Dict[int, float], optional): Dictionary of task weights for weighted loss. Default is None.
+
+        Returns:
+            None
+        """
+
         super().__init__()
         self._task_weights = task_weights
         self.encoder = AutoModel.from_pretrained(encoder_name_or_path)
@@ -44,7 +61,18 @@ class MultiTaskModel(nn.Module):
             self.output_heads[str(task.id)] = decoder
 
     @staticmethod
-    def _create_output_head(encoder_hidden_size: int, task):
+    def _create_output_head(encoder_hidden_size: int, task: Task) -> nn.Module:
+        """
+        Create the output head for a specific task.
+
+        Args:
+            encoder_hidden_size (int): Hidden size of the encoder.
+            task (Task): Task for which the output head is created.
+
+        Returns:
+            nn.Module: Output head for the task.
+        """
+
         if task.type == "seq_classification":
             return SequenceClassificationHead(encoder_hidden_size, task.num_labels)
         elif task.type == "token_classification":
@@ -53,17 +81,35 @@ class MultiTaskModel(nn.Module):
             raise NotImplementedError()
 
     def forward(
-            self,
-            input_ids=None,
-            attention_mask=None,
-            token_type_ids=None,
-            position_ids=None,
-            head_mask=None,
-            inputs_embeds=None,
-            labels=None,
-            task_ids=None,
-            **kwargs,
-    ):
+        self,
+        input_ids: torch.Tensor = None,
+        attention_mask: torch.Tensor = None,
+        token_type_ids: torch.Tensor = None,
+        position_ids: torch.Tensor = None,
+        head_mask: torch.Tensor = None,
+        inputs_embeds: torch.Tensor = None,
+        labels: torch.Tensor = None,
+        task_ids: torch.Tensor = None,
+        **kwargs
+    ) -> torch.Tensor:
+        """
+        Forward pass for the multi-task model.
+
+        Args:
+            input_ids (torch.Tensor, optional): Input IDs. Default is None.
+            attention_mask (torch.Tensor, optional): Attention mask. Default is None.
+            token_type_ids (torch.Tensor, optional): Token type IDs. Default is None.
+            position_ids (torch.Tensor, optional): Position IDs. Default is None.
+            head_mask (torch.Tensor, optional): Head mask. Default is None.
+            inputs_embeds (torch.Tensor, optional): Input embeddings. Default is None.
+            labels (torch.Tensor, optional): Labels for the tasks. Default is None.
+            task_ids (torch.Tensor, optional): Task IDs. Default is None.
+            **kwargs: Additional arguments.
+
+        Returns:
+            torch.Tensor: Output tensor from the model.
+        """
+
         if not self._deberta:
             outputs = self.encoder(
                 input_ids=input_ids,
@@ -117,12 +163,17 @@ class MultiTaskModel(nn.Module):
 
         return outputs
 
-    def save_model(self, save_dir):
+    def save_model(self, save_dir: str) -> None:
         """
-        Saves the model's state and the encoder's state.
+        Save the model's state and the encoder's state.
 
-        :param save_dir: The directory where to save the model and encoder.
+        Args:
+            save_dir (str): Directory where to save the model and encoder.
+
+        Returns:
+            None
         """
+
         # Create directory if it doesn't exist
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
@@ -138,16 +189,19 @@ class MultiTaskModel(nn.Module):
         self.encoder.save_pretrained(encoder_save_path)
 
     @classmethod
-    def load_model(cls, load_dir, tasks, task_weights=None):
+    def load_model(cls, load_dir: str, tasks: List[Task], task_weights: Dict[int, float] = None) -> 'MultiTaskModel':
         """
-        Loads the model's state and the encoder's state.
+        Load the model's state and the encoder's state.
 
-        :param load_dir: The directory from where to load the model and encoder.
-        :param tasks: The list of tasks (required for model instantiation).
-        :param task_weights: task weights (optional).
+        Args:
+            load_dir (str): Directory from where to load the model and encoder.
+            tasks (List[Task]): List of tasks (required for model instantiation).
+            task_weights (Dict[int, float], optional): Task weights. Default is None.
 
-        :return: An instance of MultiTaskModel loaded from disk.
+        Returns:
+            MultiTaskModel: An instance of MultiTaskModel loaded from disk.
         """
+
         # Load the encoder (transformer model)
         encoder_load_path = os.path.join(load_dir, "encoder")
         # Create a model instance
@@ -161,7 +215,19 @@ class MultiTaskModel(nn.Module):
 
 
 class TokenClassificationHead(nn.Module):
-    def __init__(self, hidden_size, num_labels, dropout_p=0.1):
+    def __init__(self, hidden_size: int, num_labels: int, dropout_p: float = 0.1) -> None:
+        """
+        Initialize the token classification head.
+
+        Args:
+            hidden_size (int): Hidden size of the encoder.
+            num_labels (int): Number of labels for the task.
+            dropout_p (float, optional): Dropout probability. Default is 0.1.
+
+        Returns:
+            None
+        """
+
         super().__init__()
         self.dropout = nn.Dropout(dropout_p)
         self.classifier = nn.Linear(hidden_size, num_labels)
@@ -175,8 +241,22 @@ class TokenClassificationHead(nn.Module):
             self.classifier.bias.data.zero_()
 
     def forward(
-        self, sequence_output, pooled_output, labels=None, attention_mask=None, **kwargs
-    ):
+        self, sequence_output: torch.Tensor, pooled_output: torch.Tensor, labels: torch.Tensor = None, attention_mask: torch.Tensor = None, **kwargs
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass for the token classification head.
+
+        Args:
+            sequence_output (torch.Tensor): Sequence output from the encoder.
+            pooled_output (torch.Tensor): Pooled output from the encoder.
+            labels (torch.Tensor, optional): Labels for the task. Default is None.
+            attention_mask (torch.Tensor, optional): Attention mask. Default is None.
+            **kwargs: Additional arguments.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Logits and loss (if labels are provided).
+        """
+
         sequence_output_dropout = self.dropout(sequence_output)
         logits = self.classifier(sequence_output_dropout)
 
@@ -201,9 +281,20 @@ class TokenClassificationHead(nn.Module):
 
         return logits, loss
 
-
 class SequenceClassificationHead(nn.Module):
-    def __init__(self, hidden_size, num_labels, dropout_p=0.1):
+    def __init__(self, hidden_size: int, num_labels: int, dropout_p: float = 0.1) -> None:
+        """
+        Initialize the sequence classification head.
+
+        Args:
+            hidden_size (int): Hidden size of the encoder.
+            num_labels (int): Number of labels for the task.
+            dropout_p (float, optional): Dropout probability. Default is 0.1.
+
+        Returns:
+            None
+        """
+
         super().__init__()
         self.num_labels = num_labels
         self.dropout = nn.Dropout(dropout_p)
@@ -211,7 +302,21 @@ class SequenceClassificationHead(nn.Module):
 
         self._init_weights()
 
-    def forward(self, sequence_output, pooled_output, labels=None, **kwargs):
+    def forward(self, sequence_output: torch.Tensor, pooled_output: torch.Tensor, 
+                labels: torch.Tensor = None, **kwargs) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Forward pass for the sequence classification head.
+
+        Args:
+            sequence_output (torch.Tensor): Sequence output from the encoder.
+            pooled_output (torch.Tensor): Pooled output from the encoder.
+            labels (torch.Tensor, optional): Labels for the task. Default is None.
+            **kwargs: Additional arguments.
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: Logits and loss (if labels are provided).
+        """
+
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
 
@@ -232,5 +337,3 @@ class SequenceClassificationHead(nn.Module):
         self.classifier.weight.data.normal_(mean=0.0, std=0.02)
         if self.classifier.bias is not None:
             self.classifier.bias.data.zero_()
-
-
