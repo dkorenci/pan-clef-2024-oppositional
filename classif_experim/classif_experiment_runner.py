@@ -17,7 +17,7 @@ def build_transformer_model(
     ) -> SklearnTransformerClassif:
     """
     Factory method for building a sklearn-wrapped transformer model.
-    
+
     Args:
         model_label (str): Identifier for the Hugging Face transformer model.
         model_hparams (dict): Hyperparameters for the model training.
@@ -36,12 +36,12 @@ def run_classif_crossvalid(
         positive_class: str = 'critical', 
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
-        test: int = int, 
+        test: int = 0, 
         pause_after_fold: int = 0
     ) -> dict:
     """
     Run k-fold cross-validation for a given model and report the results.
-    
+
     Args:
         lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
         model_label (str): Identifier for the Hugging Face transformer model.
