@@ -36,7 +36,7 @@ def run_classif_crossvalid(
         positive_class: str = 'critical', 
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
-        test: bool = False, 
+        test: int = int, 
         pause_after_fold: int = 0
     ) -> dict:
     """
@@ -49,7 +49,7 @@ def run_classif_crossvalid(
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
         num_folds (int, optional): Number of folds for cross-validation. Default is 5.
         rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
-        test (bool, optional): If true, use a subset of the data for testing. Default is False.
+        test (int, optional): If true, use a subset of the data for testing. Default is 0.
         pause_after_fold (int, optional): Minutes to pause after each fold. Default is 0.
 
     Returns:
