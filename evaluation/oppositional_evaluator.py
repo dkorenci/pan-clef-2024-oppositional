@@ -160,7 +160,7 @@ def spans_annots_to_spanF1_format(texts_json: List[Dict]) -> Dict[str, List[List
             span_ranges = sorted([s[1:3] for s in spans if s[0] == l], key=lambda x: x[0])
             # map each char range to a set of character indices
             for start, end in span_ranges:
-                f1spans.append([l, set(range(start, end))])
+                f1spans.append([l, set(range(start, end+1))])
         result[text_id] = f1spans
     return result
 
@@ -184,15 +184,24 @@ def calc_macro_averages(result, verbose=False, overwrite_with_macro=False):
                 print(f"{label}-{measure}: {result[f'{label}-{measure}']:.3f}")
             print()
 
-def evaluate_task2(predictions_path, gold_path, verbose=False):
+def id_set(data): return set(txt_data['id'] for txt_data in data)
+
+def evaluate_task2(predictions_path, gold_path, verbose=False, allow_test_subset=False):
     '''
     Evaluate the predictions for Task 2, the sequence labeling task.
+    :param allow_test_subset: if True, allow the test set to be a subset of the full dataset
     :return:
     '''
     # load and validate the predictions
     predictions = load_json(predictions_path)
     gold = load_json(gold_path)
-    ensure_id_consistency(predictions, gold)
+    if not allow_test_subset: ensure_id_consistency(predictions, gold)
+    else:
+        ensure_id_uniqueness(predictions)
+        ensure_id_uniqueness(gold)
+        pred_ids, gold_ids = id_set(predictions), id_set(gold)
+        if not pred_ids.issubset(gold_ids):
+            raise ValueError(f"Test set IDs are not a subset of the full dataset")
     check_sequence_predictions(predictions)
     # calculate and print the evaluation metrics
     predictions_spanf1 = spans_annots_to_spanF1_format(predictions)
