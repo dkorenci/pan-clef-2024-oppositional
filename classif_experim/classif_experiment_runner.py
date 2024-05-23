@@ -5,10 +5,13 @@ import datetime
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import StratifiedKFold
+from transformers import AutoTokenizer
 
 from classif_experim.classif_utils import classif_scores
 from classif_experim.hf_skelarn_wrapper import SklearnTransformerClassif
 from data_tools.dataset_loaders import load_dataset_classification
+from data_tools.dataset_processers import mask_words
+
 
 def build_transformer_model(
         model_label: str, 
@@ -28,6 +31,20 @@ def build_transformer_model(
     """
 
     return SklearnTransformerClassif(hf_model_label=model_label, **model_hparams, rnd_seed=rnd_seed)
+
+def get_tokenizer(model_label: str) -> str:
+    """
+    Get the tokenizer for a given Hugging Face transformer model.
+
+    Args:
+        model_label (str): Identifier for the Hugging Face transformer model.
+
+    Returns:
+        str: The tokenizer for the model.
+    """
+    tokenizer = AutoTokenizer.from_pretrained(model_label)
+    return tokenizer
+
 
 def run_classif_crossvalid(
         lang: str,
@@ -70,11 +87,14 @@ def run_classif_crossvalid(
     for train_index, test_index in foldgen.split(texts, classes):
         logger.info(f'Starting Fold {fold_index+1}')
         model = build_transformer_model(model_label, model_params, rseed)
+        mask_token = get_tokenizer(model_label).mask_token
         logger.info(f'model built')
         # split data
         txt_tr, txt_tst = texts[train_index], texts[test_index]
         cls_tr, cls_tst = classes[train_index], classes[test_index]
         id_tst = txt_ids[test_index]
+        # mask words
+        txt_tr = mask_words(txt_tr, ['conspiracy', 'critical'], mask_token)
         # train model
         model.fit(txt_tr, cls_tr)
         # evaluate model
