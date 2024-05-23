@@ -52,6 +52,7 @@ def run_classif_crossvalid(
         model_params: dict,
         positive_class: str = 'critical', 
         translated: str = 'no',
+        mask: bool = False,
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
         test: int = 0, 
@@ -66,6 +67,7 @@ def run_classif_crossvalid(
         model_params (dict): Hyperparameters for the model training.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
         translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
+        mask (bool, optional): If true, mask specific words in the dataset. Default is False.
         num_folds (int, optional): Number of folds for cross-validation. Default is 5.
         rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
         test (int, optional): If true, use a subset of the data for testing. Default is 0.
@@ -87,14 +89,14 @@ def run_classif_crossvalid(
     for train_index, test_index in foldgen.split(texts, classes):
         logger.info(f'Starting Fold {fold_index+1}')
         model = build_transformer_model(model_label, model_params, rseed)
-        mask_token = get_tokenizer(model_label).mask_token
         logger.info(f'model built')
         # split data
         txt_tr, txt_tst = texts[train_index], texts[test_index]
         cls_tr, cls_tst = classes[train_index], classes[test_index]
         id_tst = txt_ids[test_index]
-        # mask words
-        txt_tr = mask_words(txt_tr, ['conspiracy', 'critical'], mask_token)
+        if mask:
+            mask_token = get_tokenizer(model_label).mask_token
+            txt_tr = mask_words(txt_tr, ['conspiracy', 'critical'], mask_token)
         # train model
         model.fit(txt_tr, cls_tr)
         # evaluate model
@@ -191,6 +193,7 @@ def run_classif_experiments(
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical', 
         translated: str = 'no',
+        mask: bool = False,
         model_list: list = None
     ) -> dict:
     """
@@ -207,6 +210,7 @@ def run_classif_experiments(
         max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
         translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
+        mask (bool, optional): If true, mask specific words in the dataset. Default is False.
         model_list (list, optional): List of model identifiers to test. Default is None.
 
     Returns:
@@ -222,7 +226,7 @@ def run_classif_experiments(
     params['lang'] = lang
     params['eval'] = None
     params['max_seq_length'] = max_seq_length
-    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, translated={translated}, num_folds={num_folds}, '
+    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, translated={translated}, mask={mask}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
     logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in HF_CORE_HPARAMS.items())}')
     init_batch_size = params['batch_size']
@@ -236,7 +240,7 @@ def run_classif_experiments(
                 params['gradient_accumulation_steps'] = grad_accum_steps
                 res = run_classif_crossvalid(lang=lang, model_label=model, model_params=params, num_folds=num_folds,
                                              rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold,
-                                             positive_class=positive_class, translated=translated)
+                                             positive_class=positive_class, translated=translated, mask=mask)
                 pred_res[model] = res
                 break
             except RuntimeError as e:
@@ -273,7 +277,7 @@ def run_all_critic_conspi(
     for lang in langs:
         run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
                                 positive_class='critical', pause_after_fold=1,
-                                pause_after_model=2, translated='yes')
+                                pause_after_model=2, translated='yes', mask=True)
 
 if __name__ == '__main__':
     run_all_critic_conspi()

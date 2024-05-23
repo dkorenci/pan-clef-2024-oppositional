@@ -174,6 +174,24 @@ def get_translated_dataset(
             json.dump(dataset_dict, file, ensure_ascii=False, indent=4)
     return dataset
 
+def mask_words(
+        texts: pd.Series,
+        mask_words: List[str],
+        mask_token: str
+        ) -> pd.Series:
+    """
+    Mask specific words in the dataset texts.
+    
+    Args:
+        texts (pd.Series): Texts to be processed.
+    Returns:
+        pd.Series: Processed texts.
+    """
+    splitted_words = texts.apply(lambda text: text.split())
+    masked_words = splitted_words.apply(lambda words: [mask_token if word in mask_words else word for word in words])
+    masked_texts = masked_words.apply(lambda words: ' '.join(words))
+    return masked_texts
+
 if __name__ == '__main__':
     print('Translating dataset from English to Spanish')
     dataset = get_translated_dataset('en', 'es')
