@@ -34,6 +34,7 @@ def run_classif_crossvalid(
         model_label: str, 
         model_params: dict,
         positive_class: str = 'critical', 
+        translated: str = 'no',
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
         test: int = 0, 
@@ -47,6 +48,7 @@ def run_classif_crossvalid(
         model_label (str): Identifier for the Hugging Face transformer model.
         model_params (dict): Hyperparameters for the model training.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
+        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
         num_folds (int, optional): Number of folds for cross-validation. Default is 5.
         rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
         test (int, optional): If true, use a subset of the data for testing. Default is 0.
@@ -58,7 +60,7 @@ def run_classif_crossvalid(
 
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
     score_fns = classif_scores('all')
-    texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class)
+    texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class, translated=translated)
     if test: texts, classes, txt_ids = texts[:test], classes[:test], txt_ids[:test]
     foldgen = StratifiedKFold(n_splits=num_folds, random_state=rnd_seed, shuffle=True)
     fold_index = 0
@@ -118,6 +120,9 @@ HF_MODEL_LIST = {
     'es': [
             'dccuchile/bert-base-spanish-wwm-cased',
           ],
+    'both': [
+            'bert-base-multilingual-cased',
+          ]
 }
 
 # default reasonable parameters for SklearnTransformerBase
@@ -165,6 +170,7 @@ def run_classif_experiments(
         pause_after_model: int = 0, 
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical', 
+        translated: str = 'no',
         model_list: list = None
     ) -> dict:
     """
@@ -180,6 +186,7 @@ def run_classif_experiments(
         pause_after_model (int, optional): Minutes to pause after each model. Default is 0.
         max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
+        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
         model_list (list, optional): List of model identifiers to test. Default is None.
 
     Returns:
@@ -195,7 +202,7 @@ def run_classif_experiments(
     params['lang'] = lang
     params['eval'] = None
     params['max_seq_length'] = max_seq_length
-    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, num_folds={num_folds}, '
+    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, translated={translated}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
     logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in HF_CORE_HPARAMS.items())}')
     init_batch_size = params['batch_size']
@@ -209,7 +216,7 @@ def run_classif_experiments(
                 params['gradient_accumulation_steps'] = grad_accum_steps
                 res = run_classif_crossvalid(lang=lang, model_label=model, model_params=params, num_folds=num_folds,
                                              rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold,
-                                             positive_class=positive_class)
+                                             positive_class=positive_class, translated=translated)
                 pred_res[model] = res
                 break
             except RuntimeError as e:
@@ -246,7 +253,7 @@ def run_all_critic_conspi(
     for lang in langs:
         run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
                                 positive_class='critical', pause_after_fold=1,
-                                pause_after_model=2)
+                                pause_after_model=2, translated='yes')
 
 if __name__ == '__main__':
     run_all_critic_conspi()
