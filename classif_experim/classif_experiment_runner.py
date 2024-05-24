@@ -265,8 +265,8 @@ def run_all_critic_conspi(
 
     for lang in langs:
         run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
-                                positive_class='critical', pause_after_fold=1,
-                                pause_after_model=2)
+                                positive_class='critical', pause_after_fold=0,
+                                pause_after_model=0)
 
 if __name__ == '__main__':
     run_all_critic_conspi()
