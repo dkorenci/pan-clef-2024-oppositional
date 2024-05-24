@@ -5,6 +5,7 @@ import pandas as pd
 
 from data_tools.dataset_utils import reconstruct_spacy_docs_from_json, BINARY_MAPPING_CONSPIRACY_POS, \
     BINARY_MAPPING_CRITICAL_POS, span_annot_to_spanf1_format, validate_json_annotations, is_empty_annot
+
 from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN, TRAIN_TRANSLATED_DATASET_EN_ES, TRAIN_TRANSLATED_DATASET_ES_EN
 
 
@@ -46,6 +47,7 @@ def load_dataset_full(lang: str, format: str = 'docbin', translated: str = 'no')
         #     dataset = json.load(file)
         dataset = []
         for f in fname:
+            print(f)
             with open(f, 'r', encoding='utf-8') as file:
                 dataset.extend(json.load(file))
     else: raise ValueError(f'Unknown format: {format}')

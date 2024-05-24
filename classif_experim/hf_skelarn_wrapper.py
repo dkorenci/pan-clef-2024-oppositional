@@ -40,7 +40,7 @@ def set_torch_np_random_rseed(rseed: int) -> None:
 
 class SklearnTransformerBase(metaclass=ABCMeta):
     def __init__(self, hf_model_label: str, lang: str, eval: float = 0.1, learning_rate: float = 2e-5, num_train_epochs: int = 3, 
-                 weight_decay: float = 0.01, batch_size: int = 16, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
+                 weight_decay: float = 0.01, batch_size: int = 16, fc_num_layers: int = 1, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
                  max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None) -> None:
         """
         Initialize the SklearnTransformerBase with the given parameters.
@@ -74,10 +74,12 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         self._tmp_folder = tmp_folder
         self._rnd_seed = rnd_seed
         self._batch_size = batch_size
+        self.fc_num_layers = fc_num_layers
         self._gradient_accumulation_steps = gradient_accumulation_steps
         self._warmup = warmup
         self.tokenizer = None
         self.model = None
+        
         #set_seed(rnd_seed)
         set_torch_np_random_rseed(rnd_seed)
 
@@ -294,7 +296,40 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         self._init_tokenizer_params()
         # load model
         self.model = AutoModelForSequenceClassification.from_pretrained(
-                        self._hf_model_label, num_labels=num_classes).to(self._device)
+                        self._hf_model_label, num_labels=num_classes)
+        
+        custom_top = self._create_custom_top_module(self.model.config.hidden_size, num_classes)
+        self.model.classifier = custom_top
+        
+        # print('Model top loaded with {} layers'.format(self.fc_num_layers))
+        # print('Model top: {}'.format(custom_top))
+        self.model = self.model.to(self._device)
+        
+
+    def _create_custom_top_module(self, input_size, num_classes: int) -> torch.nn.Module:
+        """
+        Create a custom top layer for the model with the given number of classes.
+        
+        Args:
+            num_classes (int): Number of classes for the classification task.
+
+        Returns:
+            torch.nn.Module: Custom top layer for the model.
+        """
+        assert self.fc_num_layers > 0
+        top = torch.nn.Sequential()
+        for i in range(self.fc_num_layers-1):
+            top.add_module(
+                f'fc{i}',
+                torch.nn.Linear(
+                    input_size // (2 ** i),
+                    input_size // (2 ** (i + 1))
+                )
+            )
+            top.add_module(f'act{i}', torch.nn.ReLU())
+        
+        top.add_module('fc_out', torch.nn.Linear(input_size // (2 ** (self.fc_num_layers-1)), num_classes))
+        return top
 
     def set_string_labels(self, labels: List[str]) -> None:
         """
@@ -475,6 +510,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
             self.model = trainer.model
         del trainer
         torch.cuda.empty_cache()
+        
 
     @classmethod
     def load(cls, input_dir: str, device: torch.device = None) -> 'SklearnTransformerClassif':
@@ -496,6 +532,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         model_path = os.path.join(input_dir, 'pytorch_model.bin')
         if device is None: device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         instance.model = AutoModelForSequenceClassification.from_pretrained(input_dir).to(device)
+
         return instance
 
 

@@ -154,6 +154,7 @@ HF_CORE_HPARAMS = {
     'warmup': 0.1,
     'weight_decay': 0.01,
     'batch_size': 16,
+    'fc_num_layers': 3,
 }
 
 DEFAULT_RND_SEED = 564671
@@ -277,7 +278,7 @@ def run_all_critic_conspi(
     for lang in langs:
         run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
                                 positive_class='critical', pause_after_fold=0,
-                                pause_after_model=0, translated='yes', mask=True)
+                                pause_after_model=0, translated='no', mask=True)
 
 if __name__ == '__main__':
     run_all_critic_conspi()
