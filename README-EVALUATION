@@ -21,8 +21,9 @@ For the classification task, the referent evaluation metric is the MCC score (Ma
 Macro-averaged F1 score and per-class F1 scores will also be reported.
 
 For the sequence labeling task, the referent evaluation metric is the span-F1 score.
-The final span-F1 score will be calculated as the (macro) average of the span-F1 scores for each span category.
-Macro-averaged precision and recall will also be reported.
+The final span-F1 score will be calculated as the average of the span-F1 scores
+for each span category, ie, the macro averaged span-F1.
+Micro-averaged precision and recall will also be reported.
 
 ********** DETAILS OF THE EVALUATION PROCEDURE **********
 
