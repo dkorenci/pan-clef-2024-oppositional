@@ -5,34 +5,53 @@ import pandas as pd
 
 from data_tools.dataset_utils import reconstruct_spacy_docs_from_json, BINARY_MAPPING_CONSPIRACY_POS, \
     BINARY_MAPPING_CRITICAL_POS, span_annot_to_spanf1_format, validate_json_annotations, is_empty_annot
-from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN
+from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN, TRAIN_TRANSLATED_DATASET_EN_ES, TRAIN_TRANSLATED_DATASET_ES_EN
 
 
-def load_dataset_full(lang: str, format: str = 'docbin') -> Union[List, str]:
+def load_dataset_full(lang: str, format: str = 'docbin', translated: str = 'no') -> Union[List, str]:
     """
     Load a dataset in .json format and optionally convert it to .docbin format.
 
     Args:
-        lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        lang (str): Language of the dataset ('en' for English, 'es' for Spanish, 'both' for both languages).
         format (str, optional): Format to load the dataset in ('docbin' or 'json'). Default is 'docbin'.
+        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
 
     Returns:
         Union[List, str]: Loaded dataset in the specified format.
     """
 
     print(f'Loading official JSON {lang} dataset')
-    if lang == 'en': fname = TRAIN_DATASET_EN
-    elif lang == 'es': fname = TRAIN_DATASET_ES
+    if lang == 'en':
+        lang = ['en']
+        fname = []
+        if translated == 'no' or translated == 'yes': fname.append(TRAIN_DATASET_EN)
+        if translated == 'yes' or translated == 'only': fname.append(TRAIN_TRANSLATED_DATASET_ES_EN)
+    elif lang == 'es':
+        lang = ['es']
+        fname = []
+        if translated == 'no' or translated == 'yes': fname.append(TRAIN_DATASET_ES)
+        if translated == 'yes' or translated == 'only': fname.append(TRAIN_TRANSLATED_DATASET_EN_ES)
+    elif lang == 'both':
+        lang = ['en', 'es']
+        fname [TRAIN_DATASET_EN, TRAIN_DATASET_ES]
     else: raise ValueError(f'Unknown language: {lang}')
     if format == 'docbin':
-        dataset = reconstruct_spacy_docs_from_json(fname, lang)
+        # dataset = reconstruct_spacy_docs_from_json(fname, lang)
+        dataset = []
+        for f, l in zip(fname, lang):
+            dataset.extend(reconstruct_spacy_docs_from_json(f, l))
     elif format == 'json':
-        with open(fname, 'r', encoding='utf-8') as file:
-            dataset = json.load(file)
+        # with open(fname, 'r', encoding='utf-8') as file:
+        #     dataset = json.load(file)
+        dataset = []
+        for f in fname:
+            with open(f, 'r', encoding='utf-8') as file:
+                dataset.extend(json.load(file))
     else: raise ValueError(f'Unknown format: {format}')
     return dataset
 
-def load_dataset_classification(lang: str, string_labels: bool = False, positive_class: str = 'conspiracy') -> Tuple[pd.Series, pd.Series, pd.Series]:
+def load_dataset_classification(lang: str, string_labels: bool = False, positive_class: str = 'conspiracy', translated: str = 'no') -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
     Load the official .json dataset and convert it to a format suitable for classification.
 
@@ -40,12 +59,13 @@ def load_dataset_classification(lang: str, string_labels: bool = False, positive
         lang (str): Language of the dataset ('en' or 'es').
         string_labels (bool, optional): If True, return original string labels from json, otherwise return binary labels. Default is False.
         positive_class (str, optional): Positive class label used in training ('conspiracy' or 'critical'). Default is 'conspiracy'.
+        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
 
     Returns:
         Tuple[pd.Series, pd.Series, pd.Series]: Texts, binary classes (1 - positive, 0 - negative), and text ids as pandas Series.
     """
 
-    dataset = load_dataset_full(lang, format='json')
+    dataset = load_dataset_full(lang, format='json', translated=translated)
     # convert to a format suitable for classification
     texts = pd.Series([doc['text'] for doc in dataset])
     if string_labels: classes = pd.Series([doc['category'] for doc in dataset])
@@ -134,5 +154,3 @@ def load_span_annotations_from_json(json_file: str, span_f1_format: bool = True)
 if __name__ == '__main__':
     #calculate_json_dataset_stats(load_dataset_full('en', format='json'), label='EN')
     load_span_annotations_from_json(TEST_DATASET_EN, span_f1_format=True)
-
-
