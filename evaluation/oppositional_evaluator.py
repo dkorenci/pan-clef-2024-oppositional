@@ -186,7 +186,7 @@ def calc_macro_averages(result, verbose=False, overwrite_with_macro=False):
 
 def id_set(data): return set(txt_data['id'] for txt_data in data)
 
-def evaluate_task2(predictions_path, gold_path, verbose=False, allow_test_subset=False):
+def evaluate_task2(predictions_path, gold_path, verbose=False, allow_test_subset=True):
     '''
     Evaluate the predictions for Task 2, the sequence labeling task.
     :param allow_test_subset: if True, allow the test set to be a subset of the full dataset
@@ -211,7 +211,9 @@ def evaluate_task2(predictions_path, gold_path, verbose=False, allow_test_subset
     if verbose:
         print(f"Span F1: {result['macro-F1']:.3f}, Span P: {result['macro-P']:.3f}, Span R: {result['macro-R']:.3f}")
     # return a map of key-value pairs of the evaluation metrics, only for the above metrics
-    return {f'span-{measure}': result[f'macro-{measure}'] for measure in ['P', 'R', 'F1']}
+    final_result = {f'span-{measure}': result[f'macro-{measure}'] for measure in ['P', 'R', 'F1']}
+    final_result['micro-span-F1'] = result['micro-F1']
+    return final_result
 
 def print_results(results, outdir):
     '''
