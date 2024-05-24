@@ -160,7 +160,7 @@ def spans_to_spanF1_format(ref_docs, spans: List[Tuple[str, int, int, str]]):
             for start, end in span_ranges:
                 first_char_index = doc[start].idx
                 last_char_index = doc[end - 1].idx + len(doc[end - 1])
-                f1spans.append([l, set(range(first_char_index, last_char_index))])
+                f1spans.append([l, set(range(first_char_index, last_char_index+1))])
         result[text_id] = f1spans
     return result
 
