@@ -147,16 +147,6 @@ HF_MODEL_LIST = {
           ]
 }
 
-# default reasonable parameters for SklearnTransformerBase
-HF_CORE_HPARAMS = {
-    'learning_rate': 2e-5,
-    'num_train_epochs': 3,
-    'warmup': 0.1,
-    'weight_decay': 0.01,
-    'batch_size': 16,
-    'fc_num_layers': 3,
-}
-
 DEFAULT_RND_SEED = 564671
 
 logger = None
@@ -195,7 +185,8 @@ def run_classif_experiments(
         positive_class: str = 'critical', 
         translated: str = 'no',
         mask: bool = False,
-        model_list: list = None
+        model_list: list = None,
+        hf_core_hparams: dict = {},
     ) -> dict:
     """
     Run classification experiments, testing different models and configurations.
@@ -213,6 +204,7 @@ def run_classif_experiments(
         translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
         mask (bool, optional): If true, mask specific words in the dataset. Default is False.
         model_list (list, optional): List of model identifiers to test. Default is None.
+        hf_core_hparams (dict, optional): Hyperparameters for the model training. Default is {}.
 
     Returns:
         dict: Dictionary mapping model identifiers to prediction results.
@@ -223,13 +215,13 @@ def run_classif_experiments(
     log_filename = f"cls_exp_{timestamp}_{experim_label}.log"
     setup_logging(log_filename)
     models = HF_MODEL_LIST[lang] if model_list is None else model_list
-    params = copy(HF_CORE_HPARAMS)
+    params = copy(hf_core_hparams)
     params['lang'] = lang
     params['eval'] = None
     params['max_seq_length'] = max_seq_length
     logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, translated={translated}, mask={mask}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
-    logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in HF_CORE_HPARAMS.items())}')
+    logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in hf_core_hparams.items())}')
     init_batch_size = params['batch_size']
     pred_res = {}
     for model in models:
@@ -272,7 +264,8 @@ def run_all_critic_conspi(
         positive_class: str = 'critical',
         translated: str = 'no',
         mask: bool = False,
-        model_list: list = None
+        model_list: list = None,
+        hf_core_hparams: dict = {}
     ) -> None:
     """
     Run classification experiments for multiple languages and classes.
@@ -300,10 +293,7 @@ def run_all_critic_conspi(
                     experim_label=experim_label, pause_after_fold=pause_after_fold,
                     pause_after_model=pause_after_model, max_seq_length=max_seq_length,
                     positive_class=positive_class, translated=translated, mask=mask,
-                    model_list=model_list)
-
-####################################################################################################
-config = {}
+                    model_list=model_list, hf_core_hparams=hf_core_hparams)
 
 def load_config_yml(
         config_file: str
@@ -323,8 +313,6 @@ def load_config_yml(
         config = yaml.safe_load(file)
     return config
 
-
-
 def main(config_file: str) -> None:
     """
     Main function for running classification experiments.
@@ -335,24 +323,8 @@ def main(config_file: str) -> None:
     Returns:
         None
     """
-
-    global config
-    config = load_config_yml(config_file)
-
-    global HF_CORE_HPARAMS
-    if 'hf_core_hparams' in config:
-        HF_CORE_HPARAMS.update(config['hf_core_hparams'])
-        del config['hf_core_hparams']
-
-    run_all_critic_conspi(**config)
+    run_all_critic_conspi(**load_config_yml(config_file))
 
 if __name__ == '__main__':
-
-    from pathlib import Path
-    current_dir = Path(__file__).resolve().parent
-    config_file = current_dir / 'classif_experiment_config.yml'
-
-    main(config_file)
-
-
-
+    import os
+    main(os.path.join(os.path.dirname(__file__), 'classif_experiment_config.yml'))
