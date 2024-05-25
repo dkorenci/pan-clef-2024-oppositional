@@ -220,7 +220,7 @@ def run_classif_experiments(
 
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     experim_label = f'{experim_label}_rseed_{rnd_seed}' if experim_label else f'rseed_{rnd_seed}'
-    log_filename = f"classification_experiments_{experim_label}_{timestamp}.log"
+    log_filename = f"cls_exp_{timestamp}_{experim_label}.log"
     setup_logging(log_filename)
     models = HF_MODEL_LIST[lang] if model_list is None else model_list
     params = copy(HF_CORE_HPARAMS)
@@ -262,23 +262,97 @@ def run_classif_experiments(
 
 def run_all_critic_conspi(
         seed: int = DEFAULT_RND_SEED, 
-        langs: list = ['en', 'es']
+        langs: list = ['en', 'es'],
+        num_folds: int = 5,
+        test: bool = False,
+        experim_label: str = None,
+        pause_after_fold: int = 0,
+        pause_after_model: int = 0,
+        max_seq_length: int = MAX_SEQ_LENGTH,
+        positive_class: str = 'critical',
+        translated: str = 'no',
+        mask: bool = False,
+        model_list: list = None
     ) -> None:
     """
     Run classification experiments for multiple languages and classes.
     
+    Args:gs:
+    seed (int, optional): Random seed for reproducibility. Default is DEFAULT_RND_SEED.
+    langs (list, optional): List of languages to test. Default is ['en', 'es'].
+    num_folds (int, optional): Number of folds for cross-validation. Default is 5.
+    test (bool, optional): If true, use a subset of the data for testing. Default is False.
+    experim_label (str, optional): Label for the experiment. Default is None.
+    pause_after_fold (int, optional): Minutes to pause after each fold. Default is 0.
+    pause_after_model (int, optional): Minutes to pause after each model. Default is 0.
+    max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
+    positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
+    translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
+    mask (bool, optional): If true, mask specific words in the dataset. Default is False.
+    model_list (list, optional): List of model identifiers to test. Default is None.
+
+    Returns:
+    None
+    """
+
+    for lang in langs:
+        run_classif_experiments(lang=lang, num_folds=num_folds, rnd_seed=seed, test=test,
+                    experim_label=experim_label, pause_after_fold=pause_after_fold,
+                    pause_after_model=pause_after_model, max_seq_length=max_seq_length,
+                    positive_class=positive_class, translated=translated, mask=mask,
+                    model_list=model_list)
+
+####################################################################################################
+config = {}
+
+def load_config_yml(
+        config_file: str
+    ) -> dict:
+    """
+    Load a YAML configuration file.
+    
     Args:
-        seed (int, optional): Random seed for reproducibility. Default is DEFAULT_RND_SEED.
-        langs (list, optional): List of languages to test. Default is ['en', 'es'].
+        config_file (str): Path to the YAML configuration file.
+
+    Returns:
+        dict: Dictionary containing the configuration settings.
+    """
+
+    import yaml
+    with open(config_file) as file:
+        config = yaml.safe_load(file)
+    return config
+
+
+
+def main(config_file: str) -> None:
+    """
+    Main function for running classification experiments.
+    
+    Args:
+        config_file (str): Path to the YAML configuration file.
 
     Returns:
         None
     """
 
-    for lang in langs:
-        run_classif_experiments(lang=lang, num_folds=5, rnd_seed=seed, test=None,
-                                positive_class='critical', pause_after_fold=0,
-                                pause_after_model=0, translated='no', mask=True)
+    global config
+    config = load_config_yml(config_file)
+
+    global HF_CORE_HPARAMS
+    if 'hf_core_hparams' in config:
+        HF_CORE_HPARAMS.update(config['hf_core_hparams'])
+        del config['hf_core_hparams']
+
+    run_all_critic_conspi(**config)
 
 if __name__ == '__main__':
-    run_all_critic_conspi()
+
+    from pathlib import Path
+    current_dir = Path(__file__).resolve().parent
+    config_file = current_dir / 'classif_experiment_config.yml'
+
+    main(config_file)
+
+
+

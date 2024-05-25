@@ -1,0 +1,21 @@
+
+langs:
+  - en
+  - es
+
+hf_core_hparams:
+  # learning_rate: 2e-5
+  # num_train_epochs: 3
+  # warmup: 0.1
+  # weight_decay: 0.01
+  # batch_size: 16
+  fc_num_layers: 3
+  # model_list:
+  #   en:
+  #     - bert-base-uncased
+  #     - roberta-base
+  #     - distilbert-base-uncased
+  #   es:
+  #     - dccuchile/bert-base-spanish-wwm-cased
+  #   both:
+
