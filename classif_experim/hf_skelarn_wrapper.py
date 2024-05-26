@@ -40,8 +40,9 @@ def set_torch_np_random_rseed(rseed: int) -> None:
 
 class SklearnTransformerBase(metaclass=ABCMeta):
     def __init__(self, hf_model_label: str, lang: str, eval: float = 0.1, learning_rate: float = 2e-5, num_train_epochs: int = 3, 
-                 weight_decay: float = 0.01, batch_size: int = 16, fc_num_layers: int = 1, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
-                 max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None) -> None:
+                 weight_decay: float = 0.01, batch_size: int = 16, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
+                 max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None,
+                 fc_up_layers: int = 0, fc_down_layers: int = 1) -> None:
         """
         Initialize the SklearnTransformerBase with the given parameters.
         
@@ -74,11 +75,13 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         self._tmp_folder = tmp_folder
         self._rnd_seed = rnd_seed
         self._batch_size = batch_size
-        self.fc_num_layers = fc_num_layers
         self._gradient_accumulation_steps = gradient_accumulation_steps
         self._warmup = warmup
         self.tokenizer = None
         self.model = None
+
+        self.fc_up_layers = fc_up_layers
+        self.fc_down_layers = fc_down_layers
         
         #set_seed(rnd_seed)
         set_torch_np_random_rseed(rnd_seed)
@@ -301,7 +304,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         custom_top = self._create_custom_top_module(self.model.config.hidden_size, num_classes)
         self.model.classifier = custom_top
         
-        # print('Model top loaded with {} layers'.format(self.fc_num_layers))
+        # print('Model top loaded with {} up layers and {} down layers'.format(self.fc_up_layers, self.fc_down_layers))
         # print('Model top: {}'.format(custom_top))
         self.model = self.model.to(self._device)
         
@@ -316,19 +319,40 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         Returns:
             torch.nn.Module: Custom top layer for the model.
         """
-        assert self.fc_num_layers > 0
+        assert self.fc_up_layers >= 0 and self.fc_down_layers >= 0
+
         top = torch.nn.Sequential()
-        for i in range(self.fc_num_layers-1):
+
+        for i in range(self.fc_up_layers):
+            # print('fc_up{}: {} -> {}'.format(i, input_size * (2 ** i), input_size * (2 ** (i+1))) )
             top.add_module(
-                f'fc{i}',
+                f'fc_up{i}',
                 torch.nn.Linear(
-                    input_size // (2 ** i),
-                    input_size // (2 ** (i + 1))
+                    input_size * (2 ** i),
+                    input_size * (2 ** (i+1))
                 )
             )
-            top.add_module(f'act{i}', torch.nn.ReLU())
+            top.add_module(f'act_up{i}', torch.nn.ReLU())
+    
+        for i in range(self.fc_down_layers):
+            # print('fc_down{}: {} -> {}'.format(i, input_size * (2 ** (self.fc_up_layers - i)), input_size * (2 ** (self.fc_up_layers - i - 1))) )
+            top.add_module(
+                f'fc_down{i}',
+                torch.nn.Linear(
+
+                    int(input_size * (2 ** (self.fc_up_layers - i))),
+
+                    int(input_size * (2 ** (self.fc_up_layers - i - 1)))
+                )
+            )
+            top.add_module(f'act_down{i}', torch.nn.ReLU())
         
-        top.add_module('fc_out', torch.nn.Linear(input_size // (2 ** (self.fc_num_layers-1)), num_classes))
+        top.add_module('fc_out',
+            torch.nn.Linear(
+                int(input_size * (2 ** (self.fc_up_layers - self.fc_down_layers))),
+                num_classes
+                )
+            )
         return top
 
     def set_string_labels(self, labels: List[str]) -> None:

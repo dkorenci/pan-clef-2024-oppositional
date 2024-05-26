@@ -8,7 +8,8 @@ hf_core_hparams:
   warmup: 0.1
   weight_decay: 0.01
   batch_size: 16
-  fc_num_layers: 3
+  fc_up_layers: 0
+  fc_down_layers: 2
   # model_list:
   #   en:
   #     - bert-base-uncased
