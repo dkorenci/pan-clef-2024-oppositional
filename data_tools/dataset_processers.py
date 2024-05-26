@@ -200,7 +200,8 @@ if __name__ == '__main__':
     for src_lang in main_langs:
         for dest_lang in main_langs:
             for perm in permutations(transition_langs):
-                for lenght in range(1, len(perm)+1):
+                # for lenght in range(1, len(perm)+1):
+                for lenght in range(1, 2):
                     trans_langs = list(perm[:lenght])
                     if src_lang == trans_langs[0] or dest_lang == trans_langs[-1]:
                         continue

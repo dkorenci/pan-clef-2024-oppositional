@@ -204,7 +204,6 @@ def run_classif_experiments(
     setup_logging(log_filename)
     params = copy(hf_core_hparams)
     params['lang'] = lang
-    params['eval'] = None
     params['max_seq_length'] = max_seq_length
     logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, src_langs={src_langs}, mask={mask}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')

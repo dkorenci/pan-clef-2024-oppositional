@@ -1,4 +1,5 @@
 import random
+import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
 from copy import copy
@@ -12,10 +13,10 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import load_dataset, DatasetDict
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, matthews_corrcoef
 from sklearn.model_selection import train_test_split
 from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer, \
-    TextClassificationPipeline
+    TextClassificationPipeline, EarlyStoppingCallback
 from transformers import AutoTokenizer, set_seed
 from transformers import DataCollatorWithPadding
 
@@ -42,7 +43,8 @@ class SklearnTransformerBase(metaclass=ABCMeta):
     def __init__(self, hf_model_label: str, lang: str, eval: float = 0.1, learning_rate: float = 2e-5, num_train_epochs: int = 3, 
                  weight_decay: float = 0.01, batch_size: int = 16, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
                  max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None,
-                 fc_up_layers: int = 0, fc_down_layers: int = 1) -> None:
+                 fc_up_layers: int = 0, fc_down_layers: int = 1, eval_metric: str = None, rel_stop_threshold: float = 0.01,
+                 stop_patience = 3) -> None:
         """
         Initialize the SklearnTransformerBase with the given parameters.
         
@@ -51,7 +53,7 @@ class SklearnTransformerBase(metaclass=ABCMeta):
             lang (str): Language of the model ('en' for English, 'es' for Spanish).
             eval (float, optional): Proportion of the training set used for evaluation. Default is 0.1.
             learning_rate (float, optional): Learning rate for training. Default is 2e-5.
-            num_train_epochs (int, optional): Number of training epochs. Default is 3.
+            num_train_epochs (int, optional): Number of training epochs. Default is 3. Won't be used if stop_metric is not None.
             weight_decay (float, optional): Weight decay for training. Default is 0.01.
             batch_size (int, optional): Batch size for training. Default is 16.
             warmup (float, optional): Warmup ratio for learning rate. Default is 0.1.
@@ -60,6 +62,11 @@ class SklearnTransformerBase(metaclass=ABCMeta):
             device (torch.device, optional): Device for model training and evaluation. Default is None.
             rnd_seed (int, optional): Random seed for reproducibility. Default is 381757.
             tmp_folder (str, optional): Temporary folder for model checkpoints. Default is None.
+            fc_up_layers (int, optional): Number of up layers in the custom top module. Default is 0.
+            fc_down_layers (int, optional): Number of down layers in the custom top module. Default is 1.
+            eval_metric (str, optional): Metric to use for early stopping. Default is None so no early stopping is performed.
+            rel_stop_threshold (float, optional): Relative threshold for early stopping. Default is 0.01.
+            stop_patience (int, optional): Patience for early stopping. Default is 3.
 
         Returns:
             None
@@ -67,6 +74,7 @@ class SklearnTransformerBase(metaclass=ABCMeta):
 
         self._hf_model_label = hf_model_label
         self._learning_rate = learning_rate; self._num_train_epochs = num_train_epochs
+        self._eval_metric = eval_metric; self._rel_stop_threshold = rel_stop_threshold; self._stop_patience = stop_patience
         self._weight_decay = weight_decay
         self._eval = eval; self._lang = lang
         if device: self._device = device
@@ -136,20 +144,31 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         if self._eval is None:
             save_params = {
                 'save_strategy' : 'no',
-                'evaluation_strategy' : 'no',
+                'eval_strategy' : 'no',
                 'output_dir': self._tmp_folder,
+                'num_train_epochs': self._num_train_epochs,
             }
         else:
             save_params = {
                 'output_dir' : self._tmp_folder,
                 'save_strategy' : 'epoch',
-                'evaluation_strategy' : 'epoch',
+                'eval_strategy' : 'epoch',
                 'save_total_limit' : 2,
-                'load_best_model_at_end' : True
+                'load_best_model_at_end' : True,
+                'metric_for_best_model' : self._eval_metric if self._eval_metric is not None else None,
+                'greater_is_better' : True if self._eval_metric in ['f1_macro', 'f1', 'f1_neg' 'accuracy', 'precision', 'recall', 'mcc'] else None,
+                'num_train_epochs' : self._num_train_epochs if self._eval_metric is None else sys.maxsize,
+                'lr_scheduler_type' : 'reduce_lr_on_plateau',
+                'lr_scheduler_kwargs': {
+                    'mode': 'max',
+                    'factor': 0.1,
+                    'patience': self._stop_patience,
+                    'threshold': self._rel_stop_threshold,
+                },
             }
         self._training_args = TrainingArguments(
             do_train=True, do_eval=self._eval is not None,
-            learning_rate=self._learning_rate, num_train_epochs=self._num_train_epochs,
+            learning_rate=self._learning_rate, 
             warmup_ratio=self._warmup, weight_decay=self._weight_decay,
             per_device_train_batch_size=self._batch_size,
             per_device_eval_batch_size=self._batch_size,
@@ -500,6 +519,42 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         for k, v in kwargs.items(): params[k] = v
         return self.tokenizer(txt, **params)
 
+    def _compute_metrics(self, eval_pred):
+        """
+        Compute metrics for evaluation.
+
+        Args:
+            eval_pred (tuple): A tuple (predictions, labels) where predictions are logits and labels are indices of the true labels.
+
+        Returns:
+            dict: Dictionary containing evaluation metrics.
+        """
+        logits, labels = eval_pred
+        predictions = np.argmax(logits, axis=-1)
+        # Calculate metrics
+        f1_macro = f1_score(labels, predictions, average='macro')
+        f1 = f1_score(labels, predictions, average='binary', pos_label=1)  # Assuming 1 is the positive class
+        f1_neg = f1_score(labels, predictions, average='binary', pos_label=0)  # Assuming 0 is the negative class
+        acc = accuracy_score(labels, predictions)
+        precision = precision_score(labels, predictions, average='binary', pos_label=1)
+        recall = recall_score(labels, predictions, average='binary', pos_label=1)
+        mcc = matthews_corrcoef(labels, predictions)
+
+        metrics = {
+            "f1_macro": f1_macro,
+            "f1": f1,
+            "f1_neg": f1_neg,
+            "accuracy": acc,
+            "precision": precision,
+            "recall": recall,
+            "mcc": mcc
+        }
+    
+        # Print metrics with 4 decimal places
+        print("Eval metrics:", {k: round(v, 4) for k, v in metrics.items()})
+
+        return metrics
+
     def _do_training(self, X: List[str], y: List[str]) -> None:
         """
         Perform the training process for the model.
@@ -527,6 +582,13 @@ class SklearnTransformerClassif(SklearnTransformerBase):
             eval_dataset=eval,
             tokenizer=self.tokenizer,
             data_collator=data_collator,
+            compute_metrics=self._compute_metrics,
+            callbacks=[
+                EarlyStoppingCallback(
+                    early_stopping_patience=self._stop_patience,
+                    early_stopping_threshold=self._rel_stop_threshold
+                )
+            ] if self._eval_metric is not None else None
         )
         trainer.train()
         if self.model is not trainer.model: # just in case
