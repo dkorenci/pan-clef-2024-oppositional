@@ -1,4 +1,3 @@
-- Traducciones de los textos con backtranslation
 - LR Scheduler
 - Cambiar optimizador
 - Top personalizao: primero aumentar dimension y luego reducirla

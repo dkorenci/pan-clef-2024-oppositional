@@ -48,25 +48,25 @@ def get_tokenizer(model_label: str) -> str:
 
 def run_classif_crossvalid(
         lang: str,
+        src_langs: list,
         model_label: str, 
         model_params: dict,
         positive_class: str = 'critical', 
-        translated: str = 'no',
         mask: bool = False,
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
         test: int = 0, 
-        pause_after_fold: int = 0
+        pause_after_fold: int = 0,
     ) -> dict:
     """
     Run k-fold cross-validation for a given model and report the results.
 
     Args:
         lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        src_langs (List[List[str]]): List of source languages for each target language.
         model_label (str): Identifier for the Hugging Face transformer model.
         model_params (dict): Hyperparameters for the model training.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
-        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
         mask (bool, optional): If true, mask specific words in the dataset. Default is False.
         num_folds (int, optional): Number of folds for cross-validation. Default is 5.
         rnd_seed (int, optional): Random seed for reproducibility. Default is 3154561.
@@ -79,7 +79,7 @@ def run_classif_crossvalid(
 
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
     score_fns = classif_scores('all')
-    texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class, translated=translated)
+    texts, classes, txt_ids = load_dataset_classification(lang, positive_class=positive_class, src_langs=src_langs)
     if test: texts, classes, txt_ids = texts[:test], classes[:test], txt_ids[:test]
     foldgen = StratifiedKFold(n_splits=num_folds, random_state=rnd_seed, shuffle=True)
     fold_index = 0
@@ -175,6 +175,7 @@ def setup_logging(
 
 def run_classif_experiments(
         lang: str, 
+        src_langs: list,
         num_folds: int, 
         rnd_seed: int, 
         test: bool = False, 
@@ -183,7 +184,6 @@ def run_classif_experiments(
         pause_after_model: int = 0, 
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical', 
-        translated: str = 'no',
         mask: bool = False,
         model_list: list = None,
         hf_core_hparams: dict = {},
@@ -193,6 +193,7 @@ def run_classif_experiments(
     
     Args:
         lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        src_langs (List[List[str]]): List of source languages for each target language.
         num_folds (int): Number of folds for cross-validation.
         rnd_seed (int): Random seed for reproducibility.
         test (bool, optional): If true, use a subset of the data for testing. Default is False.
@@ -201,7 +202,6 @@ def run_classif_experiments(
         pause_after_model (int, optional): Minutes to pause after each model. Default is 0.
         max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
         positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
-        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
         mask (bool, optional): If true, mask specific words in the dataset. Default is False.
         model_list (list, optional): List of model identifiers to test. Default is None.
         hf_core_hparams (dict, optional): Hyperparameters for the model training. Default is {}.
@@ -219,7 +219,7 @@ def run_classif_experiments(
     params['lang'] = lang
     params['eval'] = None
     params['max_seq_length'] = max_seq_length
-    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, translated={translated}, mask={mask}, num_folds={num_folds}, '
+    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, src_langs={src_langs}, mask={mask}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
     logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in hf_core_hparams.items())}')
     init_batch_size = params['batch_size']
@@ -233,7 +233,7 @@ def run_classif_experiments(
                 params['gradient_accumulation_steps'] = grad_accum_steps
                 res = run_classif_crossvalid(lang=lang, model_label=model, model_params=params, num_folds=num_folds,
                                              rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold,
-                                             positive_class=positive_class, translated=translated, mask=mask)
+                                             positive_class=positive_class, src_langs=src_langs, mask=mask)
                 pred_res[model] = res
                 break
             except RuntimeError as e:
@@ -262,7 +262,7 @@ def run_all_critic_conspi(
         pause_after_model: int = 0,
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical',
-        translated: str = 'no',
+        src_langs: list = [['en'], ['es']],
         mask: bool = False,
         model_list: list = None,
         hf_core_hparams: dict = {}
@@ -270,7 +270,7 @@ def run_all_critic_conspi(
     """
     Run classification experiments for multiple languages and classes.
     
-    Args:gs:
+    Args:
     seed (int, optional): Random seed for reproducibility. Default is DEFAULT_RND_SEED.
     langs (list, optional): List of languages to test. Default is ['en', 'es'].
     num_folds (int, optional): Number of folds for cross-validation. Default is 5.
@@ -280,19 +280,18 @@ def run_all_critic_conspi(
     pause_after_model (int, optional): Minutes to pause after each model. Default is 0.
     max_seq_length (int, optional): Maximum sequence length for the model. Default is MAX_SEQ_LENGTH.
     positive_class (str, optional): The positive class label used for model training. Default is 'critical'.
-    translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
+    src_langs (List[List[List[str]]], optional): List of source languages for each target language. Default is [['en'], ['es']].
     mask (bool, optional): If true, mask specific words in the dataset. Default is False.
     model_list (list, optional): List of model identifiers to test. Default is None.
 
     Returns:
     None
     """
-
-    for lang in langs:
+    for index, lang in enumerate(langs):
         run_classif_experiments(lang=lang, num_folds=num_folds, rnd_seed=seed, test=test,
                     experim_label=experim_label, pause_after_fold=pause_after_fold,
                     pause_after_model=pause_after_model, max_seq_length=max_seq_length,
-                    positive_class=positive_class, translated=translated, mask=mask,
+                    positive_class=positive_class, src_langs=src_langs[index], mask=mask,
                     model_list=model_list, hf_core_hparams=hf_core_hparams)
 
 def load_config_yml(
@@ -323,6 +322,7 @@ def main(config_file: str) -> None:
     Returns:
         None
     """
+    print(load_config_yml(config_file))
     run_all_critic_conspi(**load_config_yml(config_file))
 
 if __name__ == '__main__':

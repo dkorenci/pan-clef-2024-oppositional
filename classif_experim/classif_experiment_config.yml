@@ -2,6 +2,10 @@ langs:
   - en
   - es
 
+src_langs:
+  - - - en
+  - - - es
+
 hf_core_hparams:
   learning_rate: 0.00002
   num_train_epochs: 3
