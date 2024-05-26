@@ -1,73 +1,88 @@
 import json
+import os
 from typing import List, Tuple, Union
+from spacy.tokens import Doc
 
 import pandas as pd
 
 from data_tools.dataset_utils import reconstruct_spacy_docs_from_json, BINARY_MAPPING_CONSPIRACY_POS, \
-    BINARY_MAPPING_CRITICAL_POS, span_annot_to_spanf1_format, validate_json_annotations, is_empty_annot
+    BINARY_MAPPING_CRITICAL_POS, span_annot_to_spanf1_format, validate_json_annotations, is_empty_annot, \
+    get_transtation_file_name
 
-from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN, TRAIN_TRANSLATED_DATASET_EN_ES, TRAIN_TRANSLATED_DATASET_ES_EN
+from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TEST_DATASET_EN, TRAIN_TRANSLATED_DATASET_FOLDER
 
 
-def load_dataset_full(lang: str, format: str = 'docbin', translated: str = 'no') -> Union[List, str]:
+def load_dataset_full(
+        dest_lang: str, 
+        src_langs: List[List[str]],
+        format: str = 'docbin', 
+    ) -> Union[List[Doc], str]:
     """
     Load a dataset in .json format and optionally convert it to .docbin format.
 
     Args:
-        lang (str): Language of the dataset ('en' for English, 'es' for Spanish, 'both' for both languages).
+        lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
+        src_langs (List[List[str]]): Source languages for the dataset. The format is a list of list, where each list contains the source language code and optionally additional languages for translation.
         format (str, optional): Format to load the dataset in ('docbin' or 'json'). Default is 'docbin'.
-        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
 
     Returns:
-        Union[List, str]: Loaded dataset in the specified format.
+        Union[List[Doc], str]: Loaded dataset in the specified format.
     """
-
-    print(f'Loading official JSON {lang} dataset')
-    if lang == 'en':
-        lang = ['en']
-        fname = []
-        if translated == 'no' or translated == 'yes': fname.append(TRAIN_DATASET_EN)
-        if translated == 'yes' or translated == 'only': fname.append(TRAIN_TRANSLATED_DATASET_ES_EN)
-    elif lang == 'es':
-        lang = ['es']
-        fname = []
-        if translated == 'no' or translated == 'yes': fname.append(TRAIN_DATASET_ES)
-        if translated == 'yes' or translated == 'only': fname.append(TRAIN_TRANSLATED_DATASET_EN_ES)
-    elif lang == 'both':
-        lang = ['en', 'es']
-        fname [TRAIN_DATASET_EN, TRAIN_DATASET_ES]
-    else: raise ValueError(f'Unknown language: {lang}')
-    if format == 'docbin':
+    dest_langs = []
+    file_name = []
+    for src_lang in src_langs:
+        if len(src_lang) == 0:
+            raise ValueError('Source language is not specified')
+        elif len(src_lang) == 1:
+            if src_lang[0] == 'en':
+                dest_langs.append('en')
+                file_name.append(TRAIN_DATASET_EN)
+            elif src_lang[0] == 'es':
+                dest_langs.append('es')
+                file_name.append(TRAIN_DATASET_ES)
+            else:
+                raise ValueError(f'Unknown language: {src_lang[0]}')
+        else:
+            dest_langs.append(dest_lang)
+            file_name.append(os.path.join(TRAIN_TRANSLATED_DATASET_FOLDER, get_transtation_file_name(src_lang[0], dest_lang, src_lang[1:])))
+    if format == 'docbin': # HACK - This should be tested
         # dataset = reconstruct_spacy_docs_from_json(fname, lang)
         dataset = []
-        for f, l in zip(fname, lang):
+        for f, l in zip(file_name, dest_langs):
+            if not os.path.exists(f): raise FileNotFoundError(f'File not found: {f}')
             dataset.extend(reconstruct_spacy_docs_from_json(f, l))
     elif format == 'json':
         # with open(fname, 'r', encoding='utf-8') as file:
         #     dataset = json.load(file)
         dataset = []
-        for f in fname:
-            print(f)
+        for f in file_name:
+            print(f'Loading {f}')
+            if not os.path.exists(f): raise FileNotFoundError(f'File not found: {f}')
             with open(f, 'r', encoding='utf-8') as file:
                 dataset.extend(json.load(file))
     else: raise ValueError(f'Unknown format: {format}')
     return dataset
 
-def load_dataset_classification(lang: str, string_labels: bool = False, positive_class: str = 'conspiracy', translated: str = 'no') -> Tuple[pd.Series, pd.Series, pd.Series]:
+def load_dataset_classification(
+        lang: str, 
+        src_langs: List[List[str]],
+        string_labels: bool = False, 
+        positive_class: str = 'conspiracy',
+    ) -> Tuple[pd.Series, pd.Series, pd.Series]:
     """
     Load the official .json dataset and convert it to a format suitable for classification.
 
     Args:
         lang (str): Language of the dataset ('en' or 'es').
+        src_langs (List[List[str]]): Source languages for the dataset.
         string_labels (bool, optional): If True, return original string labels from json, otherwise return binary labels. Default is False.
         positive_class (str, optional): Positive class label used in training ('conspiracy' or 'critical'). Default is 'conspiracy'.
-        translated (str, optional): If 'only', load only the translated version of the dataset. If 'yes', load both original and translated versions. Default is 'no'.
 
     Returns:
         Tuple[pd.Series, pd.Series, pd.Series]: Texts, binary classes (1 - positive, 0 - negative), and text ids as pandas Series.
     """
 
-    dataset = load_dataset_full(lang, format='json', translated=translated)
+    dataset = load_dataset_full(lang, format='json', src_langs=src_langs)
     # convert to a format suitable for classification
     texts = pd.Series([doc['text'] for doc in dataset])
     if string_labels: classes = pd.Series([doc['category'] for doc in dataset])

@@ -247,3 +247,22 @@ def is_empty_annot(annots: List[dict]) -> bool:
     if len(annots) == 0: return True
     if len(annots) == 1 and annots[0]['category'] == NONE_LABEL: return True
     return False
+
+def get_transtation_file_name(
+        src_lang: str,
+        dest_lang: str,
+        transition_langs: List[str] = [],
+    ) -> str:
+    """
+    Get the name of the file where the translated dataset is stored.
+
+    Args:
+        src_lang (str): Source language code.
+        dest_lang (str): Destination language code.
+        transition_langs (List[str], optional): Intermediate languages to use for the translation. Default is [].
+
+    Returns:
+        str: File name.
+    """
+
+    return f'{"_".join([src_lang] + transition_langs + [dest_lang])}.json'

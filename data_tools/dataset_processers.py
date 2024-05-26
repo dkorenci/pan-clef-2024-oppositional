@@ -7,17 +7,18 @@ They all should accept this arguments or a subset of them:
 And return the same type of data.
 """
 
-import copy
 import json
 import os
 from typing import List, Tuple
+from itertools import permutations
 import pandas as pd
 from tqdm import tqdm
 from transformers import MarianMTModel, MarianTokenizer, BatchEncoding
 
 from data_tools.dataset_loaders import load_dataset_full
 from data_tools.dataset_class import DatasetElement, dataset_to_dict, dataset_from_dict
-from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TRAIN_TRANSLATED_DATASET_EN_ES, TRAIN_TRANSLATED_DATASET_ES_EN
+from data_tools.dataset_utils import get_transtation_file_name
+from settings import TRAIN_DATASET_EN, TRAIN_DATASET_ES, TRAIN_TRANSLATED_DATASET_FOLDER
 
 def _load_translation_model(
         src_lang: str,
@@ -96,11 +97,11 @@ def _translate_text(text: str, tokenizer: MarianTokenizer, model: MarianMTModel)
         transladed_chunks.append(translated_chunk)
     return ' '.join(transladed_chunks)
 
-def translate_dataset(
-    dataset: List[DatasetElement],
+def _translate_dataset(
     src_lang: str,
     dest_lang: str,
-    device: str = 'cuda'
+    transition_langs: List[str] = [],
+    device: str = 'cuda',
 ) -> List[DatasetElement]:
     """
     Translate the dataset to the specified destination language.
@@ -109,39 +110,50 @@ def translate_dataset(
         dataset (List[DatasetElement]): Dataset to translate.
         src_lang (str): Source language code.
         dest_lang (str): Destination language code.
+        transition_langs (List[str], optional): Intermediate languages to use for the translation. Default is [].
         device (str, optional): Device to use for the model. Default is 'cuda'.
     
     Returns:
         List[DatasetElement]: Translated dataset.
     """
-    translated_dataset = copy.deepcopy(dataset)
-    model, tokenizer = _load_translation_model(src_lang, dest_lang, device)
+    translated_dataset = dataset_from_dict(load_dataset_full(src_lang, format='json', src_langs=[[src_lang]]))
+    if len(transition_langs) == 0 and src_lang == dest_lang:
+        return translated_dataset
 
-    for element in tqdm(translated_dataset, desc="Translating texts"):
-        element.text = _translate_text(element.text, tokenizer, model)
+    translation_langs = [src_lang] + transition_langs + [dest_lang]
+    for src_lang, dest_lang in zip(translation_langs[:-1], translation_langs[1:]):
+        if src_lang == dest_lang:
+            raise ValueError('Source and destination languages must be different for each transition.')
+
+    new_src_index = 0
+    for last_transition_index in range(len(translation_langs) - 1, 0, -1):
+        src_lang = translation_langs[0]
+        dest_lang = translation_langs[last_transition_index]
+        mid_langs = translation_langs[1:last_transition_index]
+        if os.path.exists(os.path.join(TRAIN_TRANSLATED_DATASET_FOLDER, get_transtation_file_name(src_lang, dest_lang, mid_langs))):
+            print(f"Cached translation found for '{dest_lang}' using {[src_lang] + mid_langs}")
+            new_src_index = last_transition_index
+            translated_dataset = dataset_from_dict(load_dataset_full(dest_lang, format='json', src_langs=[[src_lang] + mid_langs]))
+            break
+
+    for lang_index in range(new_src_index, len(translation_langs) - 1):
+        src_lang = translation_langs[lang_index]
+        dest_lang = translation_langs[lang_index+1]
+        model, tokenizer = _load_translation_model(src_lang, dest_lang, device)
+
+        for element in tqdm(translated_dataset, desc=f"Translating texts from '{src_lang}' to '{dest_lang}' using {translation_langs[:lang_index+1]}"):
+            element.id = f'{element.id.split("_")[0]}_{"_".join(translation_langs[:lang_index+2])}'
+            element.text = _translate_text(element.text, tokenizer, model)
+
+        dataset_dict = dataset_to_dict(translated_dataset)
+        with open(os.path.join(TRAIN_TRANSLATED_DATASET_FOLDER, get_transtation_file_name(translation_langs[0], dest_lang, translation_langs[1:lang_index+1])), 'w') as file:
+            json.dump(dataset_dict, file, ensure_ascii=False, indent=4)
     return translated_dataset
-
-def _correct_dataset_ids(
-    dataset: List[DatasetElement],
-) -> List[DatasetElement]:
-    """
-    Correct the text ids in the dataset to so there are not duplicates.
-
-    Args:
-        dataset (List[DatasetElement]): Original dataset.
-        new_dataset (List[DatasetElement]): Translated dataset.
-    
-    Returns:
-        List[DatasetElement]: Corrected translated dataset.
-    """
-    corected_dataset = copy.deepcopy(dataset)
-    for element in corected_dataset:
-        element.id = f'{element.id}_T'
-    return corected_dataset
 
 def get_translated_dataset(
     src_lang: str,
-    dest_lang: str
+    dest_lang: str,
+    transition_langs: List[str] = [],
 ) -> List[DatasetElement]:
     """
     Load the dataset in the source language, translate it to the destination language, and return the translated dataset.
@@ -149,29 +161,19 @@ def get_translated_dataset(
     Args:
         src_lang (str): Source language code.
         dest_lang (str): Destination language code.
-    
+        transition_langs (List[str], optional): Intermediate languages that could have been used for the translation. Default is [].
+
     Returns:
         List[DatasetElement]: Translated dataset.
     """
-    if src_lang == 'en' and dest_lang == 'es':
-        dataset_path = TRAIN_TRANSLATED_DATASET_EN_ES
-    elif src_lang == 'es' and dest_lang == 'en':
-        dataset_path = TRAIN_TRANSLATED_DATASET_ES_EN
-    else:
-        raise ValueError(f'Unknown language pair: {src_lang} -> {dest_lang}')
-
-    os.makedirs(os.path.dirname(dataset_path), exist_ok=True)
+    if src_lang == dest_lang and len(transition_langs) == 0:
+        return dataset_from_dict(load_dataset_full(dest_lang, format='json', src_langs=[[dest_lang]]))
+    os.makedirs(TRAIN_TRANSLATED_DATASET_FOLDER, exist_ok=True)
 
     try:
-        dataset = dataset_from_dict(load_dataset_full(dest_lang, format='json', translated='only'))
+        dataset = dataset_from_dict(load_dataset_full(dest_lang, format='json', src_langs=[[src_lang] + transition_langs]))
     except FileNotFoundError:
-        dataset = dataset_from_dict(load_dataset_full(src_lang, format='json'))
-        dataset = translate_dataset(dataset, src_lang, dest_lang)
-        dataset = _correct_dataset_ids(dataset)
-
-        dataset_dict = dataset_to_dict(dataset)
-        with open(dataset_path, 'w', encoding='utf-8') as file:
-            json.dump(dataset_dict, file, ensure_ascii=False, indent=4)
+        dataset = _translate_dataset(src_lang, dest_lang, transition_langs)
     return dataset
 
 def mask_words(
@@ -193,8 +195,14 @@ def mask_words(
     return masked_texts
 
 if __name__ == '__main__':
-    print('Translating dataset from English to Spanish')
-    dataset = get_translated_dataset('en', 'es')
-    print(f'Translated dataset size: {len(dataset)}')
-    print(dataset[0])
-    print(dataset[-1])
+    main_langs = ['en', 'es']
+    transition_langs = ['en', 'es', 'fr', 'de', 'it']
+    for src_lang in main_langs:
+        for dest_lang in main_langs:
+            for perm in permutations(transition_langs):
+                for lenght in range(1, len(perm)+1):
+                    trans_langs = list(perm[:lenght])
+                    if src_lang == trans_langs[0] or dest_lang == trans_langs[-1]:
+                        continue
+                    get_translated_dataset(src_lang, dest_lang, trans_langs)
+                    print(f"Translation from '{src_lang}' to '{dest_lang}' using {trans_langs} completed.")

@@ -61,7 +61,7 @@ class Annotation:
 
 @dataclass
 class DatasetElement:
-    id: int
+    id: str
     text: str
     category: str
     annotations: List[Annotation]
@@ -70,7 +70,7 @@ class DatasetElement:
     @staticmethod
     def from_dict(obj: Any) -> 'DatasetElement':
         assert isinstance(obj, dict)
-        id = int(from_str(obj.get("id")))
+        id = from_str(obj.get("id"))
         text = from_str(obj.get("text"))
         category = from_str(obj.get("category"))
         annotations = from_list(Annotation.from_dict, obj.get("annotations"))
@@ -79,7 +79,7 @@ class DatasetElement:
 
     def to_dict(self) -> dict:
         result: dict = {}
-        result["id"] = from_str(str(self.id))
+        result["id"] = from_str(self.id)
         result["text"] = from_str(self.text)
         result["category"] = from_str(self.category)
         result["annotations"] = from_list(lambda x: to_class(Annotation, x), self.annotations)
