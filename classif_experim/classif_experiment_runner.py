@@ -322,7 +322,6 @@ def main(config_file: str) -> None:
     Returns:
         None
     """
-    print(load_config_yml(config_file))
     run_all_critic_conspi(**load_config_yml(config_file))
 
 if __name__ == '__main__':
