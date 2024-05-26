@@ -26,11 +26,3 @@ hf_core_hparams:
   batch_size: 16
   fc_up_layers: 0
   fc_down_layers: 2
-  # model_list:
-  #   en:
-  #     - bert-base-uncased
-  #     - roberta-base
-  #     - distilbert-base-uncased
-  #   es:
-  #     - dccuchile/bert-base-spanish-wwm-cased
-  #   both:
