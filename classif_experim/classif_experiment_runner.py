@@ -135,18 +135,6 @@ def run_classif_crossvalid(
 
 MAX_SEQ_LENGTH = 256
 
-HF_MODEL_LIST = {
-    'en': [
-           'bert-base-cased',
-          ],
-    'es': [
-            'dccuchile/bert-base-spanish-wwm-cased',
-          ],
-    'both': [
-            'bert-base-multilingual-cased',
-          ]
-}
-
 DEFAULT_RND_SEED = 564671
 
 logger = None
@@ -185,7 +173,7 @@ def run_classif_experiments(
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical', 
         mask: bool = False,
-        model_list: list = None,
+        models: list = None,
         hf_core_hparams: dict = {},
     ) -> dict:
     """
@@ -214,7 +202,6 @@ def run_classif_experiments(
     experim_label = f'{experim_label}_rseed_{rnd_seed}' if experim_label else f'rseed_{rnd_seed}'
     log_filename = f"cls_exp_{timestamp}_{experim_label}.log"
     setup_logging(log_filename)
-    models = HF_MODEL_LIST[lang] if model_list is None else model_list
     params = copy(hf_core_hparams)
     params['lang'] = lang
     params['eval'] = None
@@ -264,7 +251,7 @@ def run_all_critic_conspi(
         positive_class: str = 'critical',
         src_langs: list = [['en'], ['es']],
         mask: bool = False,
-        model_list: list = None,
+        model_list: dict = None,
         hf_core_hparams: dict = {}
     ) -> None:
     """
@@ -292,7 +279,7 @@ def run_all_critic_conspi(
                     experim_label=experim_label, pause_after_fold=pause_after_fold,
                     pause_after_model=pause_after_model, max_seq_length=max_seq_length,
                     positive_class=positive_class, src_langs=src_langs[index], mask=mask,
-                    model_list=model_list, hf_core_hparams=hf_core_hparams)
+                    models=model_list[lang], hf_core_hparams=hf_core_hparams)
 
 def load_config_yml(
         config_file: str
