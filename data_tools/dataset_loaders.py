@@ -22,7 +22,7 @@ def load_dataset_full(
 
     Args:
         lang (str): Language of the dataset ('en' for English, 'es' for Spanish).
-        src_langs (List[List[str]]): Source languages for the dataset. The format is a list of list, where each list contains the source language code and optionally additional languages for translation.
+        src_langs (List[List[str]], optional): Source languages for the dataset. The format is a list of list, where each list contains the source language code and optionally additional languages for translation. Default is [], so the dataset is loaded in the specified destination language.
         format (str, optional): Format to load the dataset in ('docbin' or 'json'). Default is 'docbin'.
 
     Returns:
@@ -30,10 +30,11 @@ def load_dataset_full(
     """
     dest_langs = []
     file_name = []
+    if len(src_langs) == 0:
+        src_langs = [[dest_lang]]
+
     for src_lang in src_langs:
-        if len(src_lang) == 0:
-            raise ValueError('Source language is not specified')
-        elif len(src_lang) == 1:
+        if len(src_lang) == 1:
             if src_lang[0] == 'en':
                 dest_langs.append('en')
                 file_name.append(TRAIN_DATASET_EN)
@@ -74,7 +75,7 @@ def load_dataset_classification(
 
     Args:
         lang (str): Language of the dataset ('en' or 'es').
-        src_langs (List[List[str]]): Source languages for the dataset.
+        src_langs (List[List[str]], optional): Source languages for the dataset. The format is a list of list, where each list contains the source language code and optionally additional languages for translation. Default is [] so the dataset is loaded in the specified destination language.
         string_labels (bool, optional): If True, return original string labels from json, otherwise return binary labels. Default is False.
         positive_class (str, optional): Positive class label used in training ('conspiracy' or 'critical'). Default is 'conspiracy'.
 
