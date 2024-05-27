@@ -1,4 +1,4 @@
-experim_label: classif_experiment
+experim_label: ex0_base
 
 langs:
   - en
@@ -11,20 +11,17 @@ src_langs:
 model_list:
   en:
     - bert-base-uncased
-    - roberta-base
-    - distilbert-base-uncased
   es:
     - dccuchile/bert-base-spanish-wwm-cased
-  both:
-    - bert-base-uncased
 
 hf_core_hparams:
   learning_rate: 0.00002
   warmup: 0.1
   weight_decay: 0.01
   batch_size: 16
+
   fc_up_layers: 0
-  fc_down_layers: 2
+  fc_down_layers: 0
 
   eval: 0.1
   # Choose between f1_macro, f1, f1_neg, acc, precision, recall, mcc or null (for epoch stop strategy)

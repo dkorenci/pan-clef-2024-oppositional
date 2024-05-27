@@ -1,3 +1,4 @@
+from logging import Logger
 import random
 import sys
 import tempfile
@@ -16,12 +17,18 @@ from datasets import load_dataset, DatasetDict
 from sklearn.metrics import f1_score, accuracy_score, precision_score, recall_score, matthews_corrcoef
 from sklearn.model_selection import train_test_split
 from transformers import AutoModelForSequenceClassification, TrainingArguments, Trainer, \
-    TextClassificationPipeline, EarlyStoppingCallback
+    TextClassificationPipeline, EarlyStoppingCallback, TrainerCallback
 from transformers import AutoTokenizer, set_seed
 from transformers import DataCollatorWithPadding
 
 from classif_experim.pynvml_helpers import print_gpu_utilization, print_cuda_devices
 
+class LoggingCallback(TrainerCallback):
+    def __init__(self, logger: Logger):
+        self.logger = logger
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        self.logger.info(f'Epoch {state.epoch} ended')
 
 def set_torch_np_random_rseed(rseed: int) -> None:
     """
@@ -44,7 +51,7 @@ class SklearnTransformerBase(metaclass=ABCMeta):
                  weight_decay: float = 0.01, batch_size: int = 16, warmup: float = 0.1, gradient_accumulation_steps: int = 1, 
                  max_seq_length: int = 128, device: torch.device = None, rnd_seed: int = 381757, tmp_folder: str = None,
                  fc_up_layers: int = 0, fc_down_layers: int = 1, eval_metric: str = None, rel_stop_threshold: float = 0.01,
-                 stop_patience = 3) -> None:
+                 stop_patience = 3, logger: Logger = None) -> None:
         """
         Initialize the SklearnTransformerBase with the given parameters.
         
@@ -67,6 +74,7 @@ class SklearnTransformerBase(metaclass=ABCMeta):
             eval_metric (str, optional): Metric to use for early stopping. Default is None so no early stopping is performed.
             rel_stop_threshold (float, optional): Relative threshold for early stopping. Default is 0.01.
             stop_patience (int, optional): Patience for early stopping. Default is 3.
+            logger (Logger, optional): Logger for the class. Default is None.
 
         Returns:
             None
@@ -87,6 +95,7 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         self._warmup = warmup
         self.tokenizer = None
         self.model = None
+        self._logger = logger
 
         self.fc_up_layers = fc_up_layers
         self.fc_down_layers = fc_down_layers
@@ -321,7 +330,8 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                         self._hf_model_label, num_labels=num_classes)
         
         custom_top = self._create_custom_top_module(self.model.config.hidden_size, num_classes)
-        self.model.classifier = custom_top
+        if custom_top is not None:
+            self.model.classifier = custom_top
         
         # print('Model top loaded with {} up layers and {} down layers'.format(self.fc_up_layers, self.fc_down_layers))
         # print('Model top: {}'.format(custom_top))
@@ -339,6 +349,8 @@ class SklearnTransformerClassif(SklearnTransformerBase):
             torch.nn.Module: Custom top layer for the model.
         """
         assert self.fc_up_layers >= 0 and self.fc_down_layers >= 0
+        if self.fc_up_layers == 0 and self.fc_down_layers == 0:
+            return None
 
         top = torch.nn.Sequential()
 
@@ -550,8 +562,8 @@ class SklearnTransformerClassif(SklearnTransformerBase):
             "mcc": mcc
         }
     
-        # Print metrics with 4 decimal places
-        print("Eval metrics:", {k: round(v, 4) for k, v in metrics.items()})
+        if self._logger is not None:
+            self._logger.info(f"Metrics: {', '.join([f'{k}: {v:.4f}' for k, v in metrics.items()])}")
 
         return metrics
 
@@ -587,8 +599,9 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                 EarlyStoppingCallback(
                     early_stopping_patience=self._stop_patience,
                     early_stopping_threshold=self._rel_stop_threshold
-                )
-            ] if self._eval_metric is not None else None
+                ) if self._eval_metric is not None else None,
+                LoggingCallback(self._logger) if self._logger is not None else None,
+            ]
         )
         trainer.train()
         if self.model is not trainer.model: # just in case

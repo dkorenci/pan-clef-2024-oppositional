@@ -1,0 +1,35 @@
+experim_label: ex2_translations1
+
+langs:
+  - en
+  - es
+
+src_langs:
+  - - - en
+    - - es
+    - - en
+  - - - es
+
+model_list:
+  en:
+    - bert-base-uncased
+  es:
+    - dccuchile/bert-base-spanish-wwm-cased
+
+hf_core_hparams:
+  learning_rate: 0.00002
+  warmup: 0.1
+  weight_decay: 0.01
+  batch_size: 16
+
+  fc_up_layers: 0
+  fc_down_layers: 0
+
+  eval: 0.1
+  # Choose between f1_macro, f1, f1_neg, acc, precision, recall, mcc or null (for epoch stop strategy)
+  eval_metric: mcc
+  rel_stop_threshold: 0.01
+  stop_patience: 5
+
+  # For epoch stop strategy (if selected)
+  num_train_epochs: 3

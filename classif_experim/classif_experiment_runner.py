@@ -30,7 +30,7 @@ def build_transformer_model(
         SklearnTransformerClassif: An instance of the SklearnTransformerClassif model.
     """
 
-    return SklearnTransformerClassif(hf_model_label=model_label, **model_hparams, rnd_seed=rnd_seed)
+    return SklearnTransformerClassif(hf_model_label=model_label, logger=logger, **model_hparams, rnd_seed=rnd_seed)
 
 def get_tokenizer(model_label: str) -> str:
     """
