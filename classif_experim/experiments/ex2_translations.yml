@@ -29,7 +29,7 @@ hf_core_hparams:
   # Choose between f1_macro, f1, f1_neg, acc, precision, recall, mcc or null (for epoch stop strategy)
   eval_metric: mcc
   rel_stop_threshold: 0.01
-  stop_patience: 5
+  stop_patience: 10
 
   # For epoch stop strategy (if selected)
   num_train_epochs: 3
