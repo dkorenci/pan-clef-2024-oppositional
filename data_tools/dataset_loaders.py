@@ -30,21 +30,20 @@ def load_dataset_full(
     """
     dest_langs = []
     file_name = []
-    if len(src_langs) == 0:
-        src_langs = [[dest_lang]]
 
     for src_lang in src_langs:
-        if len(src_lang) == 1:
-            if src_lang[0] == 'en':
+        if len(src_lang) == 0:
+            if dest_lang == 'en':
                 dest_langs.append('en')
                 file_name.append(TRAIN_DATASET_EN)
-            elif src_lang[0] == 'es':
+            elif dest_lang == 'es':
                 dest_langs.append('es')
                 file_name.append(TRAIN_DATASET_ES)
             else:
-                raise ValueError(f'Unknown language: {src_lang[0]}')
+                raise ValueError(f'Unknown language: {dest_lang}')
         else:
             dest_langs.append(dest_lang)
+            print(get_transtation_file_name(src_lang[0], dest_lang, src_lang[1:]))
             file_name.append(os.path.join(TRAIN_TRANSLATED_DATASET_FOLDER, get_transtation_file_name(src_lang[0], dest_lang, src_lang[1:])))
     if format == 'docbin': # HACK - This should be tested
         # dataset = reconstruct_spacy_docs_from_json(fname, lang)

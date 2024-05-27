@@ -5,10 +5,10 @@ langs:
   - es
 
 src_langs:
-  - - - en
+  - - []
     - - es
+  - - []
     - - en
-  - - - es
 
 model_list:
   en:

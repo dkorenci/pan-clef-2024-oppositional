@@ -20,7 +20,7 @@ hf_core_hparams:
   weight_decay: 0.01
   batch_size: 16
 
-  fc_up_layers: 2
+  fc_up_layers: 1
   fc_down_layers: 2
 
   eval: 0.1

@@ -5,8 +5,8 @@ langs:
   - es
 
 src_langs:
-  - - - en
-  - - - es
+  - - []
+  - - []
 
 model_list:
   en:
