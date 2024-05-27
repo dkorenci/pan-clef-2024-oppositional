@@ -9,11 +9,13 @@ And return the same type of data.
 
 import json
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from itertools import permutations
 import pandas as pd
 from tqdm import tqdm
 from transformers import MarianMTModel, MarianTokenizer, BatchEncoding
+from pathlib import Path
+import numpy as np
 
 from data_tools.dataset_loaders import load_dataset_full
 from data_tools.dataset_class import DatasetElement, dataset_to_dict, dataset_from_dict
@@ -176,10 +178,13 @@ def get_translated_dataset(
         dataset = _translate_dataset(src_lang, dest_lang, transition_langs)
     return dataset
 
-def mask_words(
+def mask_texts(
         texts: pd.Series,
-        mask_words: List[str],
-        mask_token: str
+        mask_token: str,
+        lang: str,
+        default_mask_prob: float,
+        special_mask_prob: float,
+        mask_word_list: Optional[List[str]] = None,
         ) -> pd.Series:
     """
     Mask specific words in the dataset texts.
@@ -189,10 +194,47 @@ def mask_words(
     Returns:
         pd.Series: Processed texts.
     """
-    splitted_words = texts.apply(lambda text: text.split())
-    masked_words = splitted_words.apply(lambda words: [mask_token if word in mask_words else word for word in words])
-    masked_texts = masked_words.apply(lambda words: ' '.join(words))
+    if mask_word_list is None:
+        mask_word_list = load_mask_words(lang)
+
+    def mask_words(text: str) -> str:
+        words = text.split(' ')
+        masked_words = []
+
+        for word in words:
+            if word.lower() in mask_word_list:
+                mask_prob = special_mask_prob
+            else:
+                mask_prob = default_mask_prob
+
+            if np.random.rand() < mask_prob:
+                masked_words.append(mask_token)
+            else:
+                masked_words.append(word)
+        
+        masked_text = ' '.join(masked_words)
+        return masked_text
+
+    masked_texts = texts.apply(mask_words)
     return masked_texts
+
+def load_mask_words(lang: str) -> List[str]:
+    """
+    Load the words to be masked from a file.
+
+    Args:
+        file_path (str): Path to the file containing the words to be masked.
+
+    Returns:
+        List[str]: List of words to be masked.
+    """
+    file_path = Path(__file__).parent / 'mask_words' / f'{lang}_words.txt'
+    with open(file_path, 'r') as file:
+        mask_words = file.read().splitlines()
+
+    print(f"Loaded {len(mask_words)} words from '{file_path}'. ")
+    return mask_words
+
 
 if __name__ == '__main__':
     main_langs = ['en', 'es']
