@@ -10,7 +10,7 @@ from transformers import AutoTokenizer
 from classif_experim.classif_utils import classif_scores
 from classif_experim.hf_skelarn_wrapper import SklearnTransformerClassif
 from data_tools.dataset_loaders import load_dataset_classification
-from data_tools.dataset_processers import mask_words
+from data_tools.dataset_processers import mask_texts
 
 
 def build_transformer_model(
@@ -52,7 +52,8 @@ def run_classif_crossvalid(
         model_label: str, 
         model_params: dict,
         positive_class: str = 'critical', 
-        mask: bool = False,
+        default_mask_prob: float = 0.0,
+        special_mask_prob: float = 0.0,
         num_folds: int = 5,
         rnd_seed: int = 3154561, 
         test: int = 0, 
@@ -94,9 +95,9 @@ def run_classif_crossvalid(
         txt_tr, txt_tst = texts[train_index], texts[test_index]
         cls_tr, cls_tst = classes[train_index], classes[test_index]
         id_tst = txt_ids[test_index]
-        if mask:
+        if default_mask_prob > 0.0 or special_mask_prob > 0.0:
             mask_token = get_tokenizer(model_label).mask_token
-            txt_tr = mask_words(txt_tr, ['conspiracy', 'critical'], mask_token)
+            txt_tr = mask_texts(txt_tr, mask_token, lang, default_mask_prob, special_mask_prob)
         # train model
         model.fit(txt_tr, cls_tr)
         # evaluate model
@@ -171,8 +172,9 @@ def run_classif_experiments(
         pause_after_fold: int = 0, 
         pause_after_model: int = 0, 
         max_seq_length: int = MAX_SEQ_LENGTH,
-        positive_class: str = 'critical', 
-        mask: bool = False,
+        positive_class: str = 'critical',  
+        default_mask_prob: float = 0.0,
+        special_mask_prob: float = 0.0,
         models: list = None,
         hf_core_hparams: dict = {},
     ) -> dict:
@@ -205,7 +207,8 @@ def run_classif_experiments(
     params = copy(hf_core_hparams)
     params['lang'] = lang
     params['max_seq_length'] = max_seq_length
-    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, src_langs={src_langs}, mask={mask}, num_folds={num_folds}, '
+    logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, src_langs={src_langs}, num_folds={num_folds}, '
+                f'default_mask_prob={default_mask_prob}, special_mask_prob={special_mask_prob}, positive_class={positive_class},'
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
     logger.info(f'... HPARAMS = {"; ".join(f"{param}: {val}" for param, val in hf_core_hparams.items())}')
     init_batch_size = params['batch_size']
@@ -219,7 +222,8 @@ def run_classif_experiments(
                 params['gradient_accumulation_steps'] = grad_accum_steps
                 res = run_classif_crossvalid(lang=lang, model_label=model, model_params=params, num_folds=num_folds,
                                              rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold,
-                                             positive_class=positive_class, src_langs=src_langs, mask=mask)
+                                             positive_class=positive_class, src_langs=src_langs,
+                                             default_mask_prob=default_mask_prob, special_mask_prob=special_mask_prob)
                 pred_res[model] = res
                 break
             except RuntimeError as e:
@@ -249,7 +253,8 @@ def run_all_critic_conspi(
         max_seq_length: int = MAX_SEQ_LENGTH,
         positive_class: str = 'critical',
         src_langs: list = [['en'], ['es']],
-        mask: bool = False,
+        default_mask_prob: float = 0.0,
+        special_mask_prob: float = 0.0,
         model_list: dict = None,
         hf_core_hparams: dict = {}
     ) -> None:
@@ -277,7 +282,8 @@ def run_all_critic_conspi(
         run_classif_experiments(lang=lang, num_folds=num_folds, rnd_seed=seed, test=test,
                     experim_label=experim_label, pause_after_fold=pause_after_fold,
                     pause_after_model=pause_after_model, max_seq_length=max_seq_length,
-                    positive_class=positive_class, src_langs=src_langs[index], mask=mask,
+                    positive_class=positive_class, src_langs=src_langs[index], 
+                    default_mask_prob=default_mask_prob, special_mask_prob=special_mask_prob,
                     models=model_list[lang], hf_core_hparams=hf_core_hparams)
 
 def load_config_yml(
@@ -312,4 +318,4 @@ def main(config_file: str) -> None:
 
 if __name__ == '__main__':
     import os
-    main(os.path.join(os.path.dirname(__file__), 'experiments/ex2_translations.yml'))
+    main(os.path.join(os.path.dirname(__file__), 'experiments/ex1_custom_top1.yml'))
