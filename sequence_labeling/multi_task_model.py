@@ -229,11 +229,65 @@ class TokenClassificationHead(nn.Module):
         """
 
         super().__init__()
-        self.dropout = nn.Dropout(dropout_p)
-        self.classifier = nn.Linear(hidden_size, num_labels)
+        self.dropout_p = dropout_p # nn.Dropout(dropout_p)
+        self.fc_up_layers = 0
+        self.fc_down_layers = 0
+        custom_top = self._create_custom_top_module(hidden_size, num_labels)
+        if custom_top is not None:
+            self.classifier = custom_top
         self.num_labels = num_labels
 
         self._init_weights()
+
+    def _create_custom_top_module(self, input_size, num_classes: int) -> torch.nn.Module:
+        """
+        Create a custom top layer for the model with the given number of classes.
+        
+        Args:
+            num_classes (int): Number of classes for the classification task.
+
+        Returns:
+            torch.nn.Module: Custom top layer for the model.
+        """
+        assert self.fc_up_layers >= 0 and self.fc_down_layers >= 0
+        if self.fc_up_layers == 0 and self.fc_down_layers == 0:
+            return None
+
+        top = torch.nn.Sequential()
+
+        for i in range(self.fc_up_layers):
+            # print('fc_up{}: {} -> {}'.format(i, input_size * (2 ** i), input_size * (2 ** (i+1))) )
+            top.add_module(
+                f'fc_up{i}',
+                torch.nn.Linear(
+                    input_size * (2 ** i),
+                    input_size * (2 ** (i+1))
+                )
+            )
+            top.add_module(f'act_up{i}', torch.nn.ReLU())
+            top.add_module(f'drop_up{i}', torch.nn.Dropout(self.dropout_p))
+    
+        for i in range(self.fc_down_layers):
+            # print('fc_down{}: {} -> {}'.format(i, input_size * (2 ** (self.fc_up_layers - i)), input_size * (2 ** (self.fc_up_layers - i - 1))) )
+            top.add_module(
+                f'fc_down{i}',
+                torch.nn.Linear(
+
+                    int(input_size * (2 ** (self.fc_up_layers - i))),
+
+                    int(input_size * (2 ** (self.fc_up_layers - i - 1)))
+                )
+            )
+            top.add_module(f'act_down{i}', torch.nn.ReLU())
+            top.add_module(f'drop_down{i}', torch.nn.Dropout(self.dropout_p))
+        
+        top.add_module('fc_out',
+            torch.nn.Linear(
+                int(input_size * (2 ** (self.fc_up_layers - self.fc_down_layers))),
+                num_classes
+                )
+            )
+        return top
 
     def _init_weights(self):
         self.classifier.weight.data.normal_(mean=0.0, std=0.02)
@@ -257,7 +311,7 @@ class TokenClassificationHead(nn.Module):
             Tuple[torch.Tensor, torch.Tensor]: Logits and loss (if labels are provided).
         """
 
-        sequence_output_dropout = self.dropout(sequence_output)
+        sequence_output_dropout = nn.Dropout(self.dropout_p)(sequence_output)
         logits = self.classifier(sequence_output_dropout)
 
         loss = None
