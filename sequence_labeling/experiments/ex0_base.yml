@@ -1,0 +1,18 @@
+src_langs:
+  en:
+    - []
+  es:
+    - []
+
+model_list:
+  en:
+    - bert-base-uncased
+  es:
+    - dccuchile/bert-base-spanish-wwm-cased
+
+hf_core_hparams:
+  learning_rate: 0.00002
+  warmup: 0.1
+  weight_decay: 0.01
+  batch_size: 16
+  eval: 0.1

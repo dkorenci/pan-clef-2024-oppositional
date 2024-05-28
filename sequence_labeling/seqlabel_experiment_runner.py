@@ -1,6 +1,7 @@
 import argparse
 import datetime
 import logging
+import os
 import time
 from copy import copy
 from typing import Dict, List, Tuple, Union
@@ -34,7 +35,7 @@ def task_label_data() -> Tuple[List[str], Dict[str, int]]:
     task_indices = {l: i for i, l in enumerate(task_labels)}
     return task_labels, task_indices
 
-def run_crossvalid_seqlab_transformers(lang: str, model_label: str, model_params: Dict, num_folds: int = 5, 
+def run_crossvalid_seqlab_transformers(lang: str, model_label: str, model_params: Dict, src_langs: List[List[str]], num_folds: int = 5, 
                                        rnd_seed: int = 3154561, test: Union[int, bool] = False, pause_after_fold: int = 0) -> None:
     """
     Run x-fold cross-validation for a given model, and report the results.
@@ -53,7 +54,7 @@ def run_crossvalid_seqlab_transformers(lang: str, model_label: str, model_params
     """
 
     logger.info(f'RUNNING crossvalid. for model: {model_label}')
-    docs = load_dataset_full(lang, format='docbin')
+    docs = load_dataset_full(lang, format='docbin', src_langs=src_langs)
     if test: docs = docs[:test]
     foldgen = StratifiedKFold(n_splits=num_folds, random_state=rnd_seed, shuffle=True)
     fold_index = 0
@@ -127,7 +128,7 @@ def build_seqlab_model(model_label: str, rseed: int, model_params: Dict,
 
 def run_seqlab_experiments(lang: str, num_folds: int, rnd_seed: int, test: Union[int, bool] = False, 
                            experim_label: str = None, pause_after_fold: int = 0, pause_after_model: int = 0, 
-                           max_seq_length: int = 256) -> None:
+                           max_seq_length: int = 256, yml_config: dict = {}) -> None:
     """
     Run sequence labeling experiments.
 
@@ -140,27 +141,25 @@ def run_seqlab_experiments(lang: str, num_folds: int, rnd_seed: int, test: Union
         pause_after_fold (int, optional): Pause duration in minutes after each fold. Default is 0.
         pause_after_model (int, optional): Pause duration in minutes after each model. Default is 0.
         max_seq_length (int, optional): Maximum sequence length. Default is 256.
+        yml_config (dict, optional): Dictionary containing the configuration settings. Default is {}.
 
     Returns:
         None
     """
-
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     experim_label = f'{experim_label}_rseed_{rnd_seed}' if experim_label else f'rseed_{rnd_seed}'
     log_filename = f"seqlabel_experiments_{experim_label}_{timestamp}.log"
     setup_logging(log_filename)
     global logger
     logger = classif_experiment_runner.logger
-    models = HF_MODEL_LIST_SEQLAB[lang]
-    HPARAMS = HF_CORE_HPARAMS_SEQLAB_MULTITASK
-    params = copy(HPARAMS)
+    models = yml_config['model_list'][lang]
+    params = copy(yml_config['hf_core_hparams'])
     params['lang'] = lang
-    params['eval'] = None
     params['max_seq_length'] = max_seq_length
     logger.info(f'RUNNING classif. experiments: lang={lang.upper()}, num_folds={num_folds}, '
                 f'max_seq_len={max_seq_length}, eval={params["eval"]}, rnd_seed={rnd_seed}, test={test}')
     logger.info(f'... SEED = {rnd_seed}')
-    logger.info(f'... HPARAMS = { "; ".join(f"{param}: {val}" for param, val in HPARAMS.items())}')
+    logger.info(f'... HPARAMS = { "; ".join(f"{param}: {val}" for param, val in yml_config["hf_core_hparams"].items())}')
     init_batch_size = params['batch_size']
     for model in models:
         try_batch_size = init_batch_size
@@ -170,7 +169,7 @@ def run_seqlab_experiments(lang: str, num_folds: int, rnd_seed: int, test: Union
                 params['batch_size'] = try_batch_size
                 params['gradient_accumulation_steps'] = grad_accum_steps
                 run_crossvalid_seqlab_transformers(lang=lang, model_label=model, model_params=params, num_folds=num_folds,
-                                       rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold)
+                                       rnd_seed=rnd_seed, test=test, pause_after_fold=pause_after_fold, src_langs=yml_config['src_langs'][lang])
                 break
             except RuntimeError as e:
                 if 'out of memory' in str(e).lower():
@@ -296,23 +295,6 @@ def demo_experiment(lang: str, test_size: float = 0.2, num_epochs: int = 1,
 
 DEFAULT_RND_SEED = 1943123
 
-HF_MODEL_LIST_SEQLAB = {
-    'en': [
-           'bert-base-cased',
-           ],
-    'es': [
-            'dccuchile/bert-base-spanish-wwm-cased',
-          ],
-}
-
-HF_CORE_HPARAMS_SEQLAB_MULTITASK = {
-    'learning_rate': 2e-5,
-    'num_train_epochs': 10,
-    'warmup': 0.1,
-    'weight_decay': 0.01,
-    'batch_size': 16,
-}
-
 def main() -> None:
     """
     Entry point function to accept command line arguments.
@@ -336,10 +318,14 @@ def main() -> None:
     parser.add_argument("--pause_after_model", type=int, default=0, help="Pause duration after model")
     parser.add_argument("--max_seq_length", type=int, default=256, help="Maximum sequence length")
     parser.add_argument("--gpu", type=int, default=0, help="index of the gpu for computation")
+    parser.add_argument("--config_file", type=str, default=None, help="Path to a YAML configuration file")
     # Parse the arguments
     args = parser.parse_args()
     test = False if args.test == 0 else args.test
     print_cuda_devices()
+    if args.config_file is None or not os.path.isfile(os.path.join(os.path.dirname(__file__), args.config_file)):
+        raise ValueError("Please provide a valid configuration file.")
+    yml_config = load_config_yml(os.path.join(os.path.dirname(__file__), args.config_file))
     # Call the function with parsed arguments
     run_seqlab_experiments(
         lang=args.lang,
@@ -350,7 +336,26 @@ def main() -> None:
         pause_after_fold=args.pause_after_fold,
         pause_after_model=args.pause_after_model,
         max_seq_length=args.max_seq_length,
+        yml_config=yml_config
     )
+
+def load_config_yml(
+        config_file: str
+    ) -> dict:
+    """
+    Load a YAML configuration file.
+    
+    Args:
+        config_file (str): Path to the YAML configuration file.
+
+    Returns:
+        dict: Dictionary containing the configuration settings.
+    """
+
+    import yaml
+    with open(config_file) as file:
+        config = yaml.safe_load(file)
+    return config
 
 if __name__ == '__main__':
     main()
