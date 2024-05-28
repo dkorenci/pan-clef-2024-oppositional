@@ -1,3 +1,4 @@
+from logging import Logger
 import random
 from typing import List, Tuple, Dict, Union
 
@@ -9,13 +10,20 @@ from datasets import Dataset, DatasetDict
 from sklearn.model_selection import train_test_split
 from spacy.tokens import Doc
 from torch import tensor as TT
-from transformers import AutoTokenizer, DataCollatorForTokenClassification, Trainer
+from transformers import AutoTokenizer, DataCollatorForTokenClassification, Trainer, TrainerCallback, EarlyStoppingCallback
 
 from classif_experim.hf_skelarn_wrapper import SklearnTransformerBase
 from data_tools.spacy_utils import get_doc_id, get_annoation_tuples_from_doc
 from sequence_labeling.multi_task_model import MultiTaskModel, Task
 from sequence_labeling.spanannot2hf import extract_spans, convert_to_hf_format, labels_from_predictions, \
     align_labels_with_tokens, extract_span_ranges
+
+class LoggingCallback(TrainerCallback):
+    def __init__(self, logger: Logger):
+        self.logger = logger
+
+    def on_epoch_end(self, args, state, control, **kwargs):
+        self.logger.info(f'Epoch {state.epoch} ended')
 
 class OppSequenceLabelerMultitask(SklearnTransformerBase):
     """
@@ -147,7 +155,15 @@ class OppSequenceLabelerMultitask(SklearnTransformerBase):
         self._init_train_args()
         trainer = Trainer(model=self.model, args=self._training_args,
             train_dataset=train_dataset, eval_dataset=eval_dataset if self._eval else None,
-            tokenizer=self.tokenizer, data_collator=data_collator)
+            tokenizer=self.tokenizer, data_collator=data_collator,
+            callbacks=[
+                # EarlyStoppingCallback(
+                #     early_stopping_patience=self._stop_patience,
+                #     early_stopping_threshold=self._rel_stop_threshold
+                # ) if self._eval_metric is not None else None,
+                # LoggingCallback(self._logger) if self._logger is not None else None,
+            ],
+        )
         trainer.train()
         if self.model is not trainer.model: # just in case
             del self.model
