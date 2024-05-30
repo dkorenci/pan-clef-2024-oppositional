@@ -79,7 +79,7 @@ def load_or_build_classif_fulltrain_model(
     else:
         print(f'No model found at {mfolder}. Building model.')
         build_classif_model_on_full_train(lang, model_name, model_label, rseed=rseed, positive_class=positive_class, save=True)
-        return SklearnTransformerClassif.load(mfolder)
+        return SklearnTransformerClassif.load(model_path)
 
 def build_classif_model_on_full_train(
         lang: str, 
@@ -109,6 +109,7 @@ def build_classif_model_on_full_train(
     #params['num_train_epochs'] = 0.5 # for testing
     try_batch_size = params['batch_size']
     mfolder = get_model_folder_name(lang, model_label, rseed, positive_class)
+    model_path = os.path.join(os.path.dirname(__file__), mfolder)
     grad_accum_steps = 1
     while try_batch_size >= 1:
         try:
@@ -116,7 +117,7 @@ def build_classif_model_on_full_train(
             params['gradient_accumulation_steps'] = grad_accum_steps
             model = build_transformer_model(model_name, params, rnd_seed=rseed)
             model.fit(txt_tr, cls_tr)
-            if save: model.save(mfolder)
+            if save: model.save(model_path)
             return model
         except RuntimeError as e:
             if 'out of memory' in str(e).lower():

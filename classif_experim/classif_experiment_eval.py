@@ -31,7 +31,7 @@ def evaluate_on_test_dataset(
     cls_pred = binary_labels_to_str(cls_pred, positive_class)
     pred_fname = f'predictions_{lang}.json'
     save_text_category_predictions_to_json(ids, cls_pred, pred_fname)
-    run_official_evaluation_script('task1', pred_fname, test_fname)
+    # run_official_evaluation_script('task1', pred_fname, test_fname)
 
 
 
