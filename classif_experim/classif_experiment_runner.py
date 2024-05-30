@@ -318,4 +318,4 @@ def main(config_file: str) -> None:
 
 if __name__ == '__main__':
     import os
-    main(os.path.join(os.path.dirname(__file__), 'experiments/ex3_models_v2.yml'))
+    main(os.path.join(os.path.dirname(__file__), 'experiments/ex4_final.yml'))

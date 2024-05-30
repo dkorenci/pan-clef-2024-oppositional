@@ -230,10 +230,12 @@ class TokenClassificationHead(nn.Module):
 
         super().__init__()
         self.dropout_p = dropout_p # nn.Dropout(dropout_p)
-        self.fc_up_layers = 0
-        self.fc_down_layers = 0
+        self.fc_up_layers = 1
+        self.fc_down_layers = 2
         custom_top = self._create_custom_top_module(hidden_size, num_labels)
         if custom_top is not None:
+            # print('Custom top created with fc_up_layers={} and fc_down_layers={}'.format(self.fc_up_layers, self.fc_down_layers))
+            # print(custom_top)
             self.classifier = custom_top
         self.num_labels = num_labels
 
@@ -290,9 +292,10 @@ class TokenClassificationHead(nn.Module):
         return top
 
     def _init_weights(self):
-        self.classifier.weight.data.normal_(mean=0.0, std=0.02)
-        if self.classifier.bias is not None:
-            self.classifier.bias.data.zero_()
+        # self.classifier.weight.data.normal_(mean=0.0, std=0.02)
+        # if self.classifier.bias is not None:
+        #     self.classifier.bias.data.zero_()
+        pass
 
     def forward(
         self, sequence_output: torch.Tensor, pooled_output: torch.Tensor, labels: torch.Tensor = None, attention_mask: torch.Tensor = None, **kwargs

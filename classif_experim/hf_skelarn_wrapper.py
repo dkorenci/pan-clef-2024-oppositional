@@ -289,6 +289,40 @@ class SklearnTransformerBase(metaclass=ABCMeta):
         instance = cls.__new__(cls)
         instance.__dict__.update(attributes)
         return instance
+    
+
+class CustomTop(torch.nn.Module):
+    def __init__(self, input_size, num_classes, fc_up_layers, fc_down_layers):
+        super(CustomTop, self).__init__()
+        self.fc_up_layers = fc_up_layers
+        self.fc_down_layers = fc_down_layers
+        self.fc_up = torch.nn.ModuleList()
+        self.fc_down = torch.nn.ModuleList()
+        
+        for i in range(self.fc_up_layers):
+            self.fc_up.append(torch.nn.Linear(input_size, input_size * 2))
+            self.fc_up.append(torch.nn.ReLU())
+            self.fc_up.append(torch.nn.Dropout(0.1))
+            input_size *= 2
+        
+        for i in range(self.fc_down_layers):
+            self.fc_down.append(torch.nn.Linear(input_size, input_size // 2))
+            self.fc_down.append(torch.nn.ReLU())
+            self.fc_down.append(torch.nn.Dropout(0.1))
+            input_size //= 2
+        
+        self.fc_out = torch.nn.Linear(input_size, num_classes)
+
+    def forward(self, x):
+        x = x[:, 0, :]
+        for fc in self.fc_up:
+            x = fc(x)
+        
+        for fc in self.fc_down:
+            x = fc(x)
+        
+        x = self.fc_out(x)
+        return x
 
 class SklearnTransformerClassif(SklearnTransformerBase):
     """
@@ -329,9 +363,19 @@ class SklearnTransformerClassif(SklearnTransformerBase):
         self.model = AutoModelForSequenceClassification.from_pretrained(
                         self._hf_model_label, num_labels=num_classes)
         
-        custom_top = self._create_custom_top_module(self.model.config.hidden_size, num_classes)
+        # print('Existing model top:')
+        # print(self.model.classifier)
+        is_roberta = True
+        if is_roberta:
+            custom_top = CustomTop(self.model.config.hidden_size, num_classes, self.fc_up_layers, self.fc_down_layers)
+        else:
+            custom_top = self._create_custom_top_module(self.model.config.hidden_size, num_classes)
+        
         if custom_top is not None:
             self.model.classifier = custom_top
+        
+        # print('New model top:')
+        # print(self.model.classifier)
         
         # print('Model top loaded with {} up layers and {} down layers'.format(self.fc_up_layers, self.fc_down_layers))
         # print('Model top: {}'.format(custom_top))
@@ -364,6 +408,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                 )
             )
             top.add_module(f'act_up{i}', torch.nn.ReLU())
+            top.add_module(f'drop_up{i}', torch.nn.Dropout(0.1))
     
         for i in range(self.fc_down_layers):
             # print('fc_down{}: {} -> {}'.format(i, input_size * (2 ** (self.fc_up_layers - i)), input_size * (2 ** (self.fc_up_layers - i - 1))) )
@@ -377,6 +422,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                 )
             )
             top.add_module(f'act_down{i}', torch.nn.ReLU())
+            top.add_module(f'drop_down{i}', torch.nn.Dropout(0.1))
         
         top.add_module('fc_out',
             torch.nn.Linear(
@@ -385,6 +431,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                 )
             )
         return top
+    
 
     def set_string_labels(self, labels: List[str]) -> None:
         """
@@ -663,6 +710,7 @@ def test_hf_wrapper(test_dset: str, model: str = 'bert-base-uncased', device: st
     # train model, evaluate
     tr = SklearnTransformerClassif(num_train_epochs=5, eval=eval, hf_model_label=model, rnd_seed=rnd_seed, device=device,
                                    lang='en')
+    
     tr.fit(txt_trdev, lab_trdev)
     lab_pred = tr.predict(txt_test)
     f1 = partial(f1_score, average='binary')
