@@ -33,9 +33,13 @@ def evaluate_on_test_dataset(
     save_text_category_predictions_to_json(ids, cls_pred, pred_fname)
     run_official_evaluation_script('task1', pred_fname, test_fname)
 
+
+
 def build_eval_model(
         lang: str, 
-        positive_class: str = 'conspiracy'
+        hf_model_id: str,
+        model_label: str,
+        positive_class: str = 'conspiracy',
     ) -> None:
     """
     Builds or loads a full training classification model and evaluates it on the test dataset.
@@ -47,11 +51,9 @@ def build_eval_model(
     Returns:
         None
     """
-
-    hf_model_id = 'bert-base-cased' if lang == 'en' else 'dccuchile/bert-base-spanish-wwm-cased'
-    model = load_or_build_classif_fulltrain_model(lang, hf_model_id, model_label='bert-baseline',
+    model = load_or_build_classif_fulltrain_model(lang, hf_model_id, model_label=model_label,
                                               positive_class=positive_class)
     evaluate_on_test_dataset(model, lang, positive_class=positive_class)
 
 if __name__ == '__main__':
-    build_eval_model('en')
+    build_eval_model('en', 'jy46604790/Fake-News-Bert-Detect', 'fake-news-bert')

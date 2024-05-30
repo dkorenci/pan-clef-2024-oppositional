@@ -1,0 +1,20 @@
+experim_label: evaluate
+
+
+hf_core_hparams:
+  learning_rate: 0.00002
+  warmup: 0.1
+  weight_decay: 0.01
+  batch_size: 16
+
+  fc_up_layers: 2
+  fc_down_layers: 2
+
+  eval: 0.1
+  # Choose between f1_macro, f1, f1_neg, acc, precision, recall, mcc or null (for epoch stop strategy)
+  eval_metric: mcc
+  rel_stop_threshold: 0.01
+  stop_patience: 10
+
+  # For epoch stop strategy (if selected)
+  num_train_epochs: 1

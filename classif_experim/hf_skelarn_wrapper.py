@@ -648,7 +648,7 @@ class SklearnTransformerClassif(SklearnTransformerBase):
                     early_stopping_threshold=self._rel_stop_threshold
                 ) if self._eval_metric is not None else None,
                 LoggingCallback(self._logger) if self._logger is not None else None,
-            ]
+            ] if self._eval else []
         )
         trainer.train()
         if self.model is not trainer.model: # just in case
