@@ -1,8 +1,10 @@
 This repository contains code with utilities, baselines, instructions, and guidelines for the
 PAN CLEF 2024 shared task "Oppositional thinking analysis: Conspiracy vs critical narratives"
 https://pan.webis.de/clef24/pan24-web/oppositional-thinking-analysis.html
+
 The code is licensed under the APACHE 2.0 license, see LICENSE file.
 The exception is the span_f1_metric.py file, which is licensed under the GPL license, see the file for details.
+The data is licensed under the CC BY-SA 4.0 license, see the LICENSE-DATA file for details.
 
 This document contains the high-level overview of the code,
 and the instructions to setup the environment for the project.
